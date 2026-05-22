@@ -8,7 +8,7 @@ import { tryCaptureStackTrace } from "try-capture-stack-trace";
  * @param signal 中止の理由を取得するための AbortSignal オブジェクトです。
  * @returns 中止の理由です。シグナルがまだ中止されていない場合は undefined を返します。
  */
-export default function getAbortReason(signal: AbortSignal) {
+export default function getAbortReason(signal: AbortSignal): unknown {
   if (!signal.aborted) {
     return undefined;
   }
