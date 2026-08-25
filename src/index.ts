@@ -1,3 +1,6 @@
+export type * from "./combine-signals-fast.js";
+export { default as combineSignalsFast } from "./combine-signals-fast.js";
+
 export type * from "./combine-signals.js";
 export { default as combineSignals } from "./combine-signals.js";
 

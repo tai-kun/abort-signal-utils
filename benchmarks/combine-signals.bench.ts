@@ -1,5 +1,6 @@
 import { bench, describe } from "vitest";
 
+import combineSignalsFast from "../src/combine-signals-fast.js";
 import combineSignals from "../src/combine-signals.js";
 
 /**
@@ -68,5 +69,29 @@ describe("combineSignals / 新規シグナル生成を含むケース", () => {
 
   bench("[比較用] controller 生成のみ", () => {
     void new AbortController().signal;
+  });
+});
+
+describe("combineSignalsFast / 単一シグナルのショートカット", () => {
+  const singleController = new AbortController();
+  const single = [singleController.signal];
+
+  bench("シグナル 1 個(同一オブジェクトを返す)", () => {
+    combineSignalsFast(single);
+  });
+
+  bench("[比較用] combineSignals シグナル 1 個(abort+cleanup 込み)", () => {
+    combineSignals(single);
+    singleController.abort("Done");
+  });
+
+  bench("シグナル 2 個(委譲・abort+cleanup 込み)", () => {
+    const controllers = makeControllers(2);
+    combineSignalsFast(controllers.map((ac) => ac.signal));
+    controllers[0]!.abort("Done");
+  });
+
+  bench("空配列(controller 生成のみ発生)", () => {
+    combineSignalsFast([]);
   });
 });
