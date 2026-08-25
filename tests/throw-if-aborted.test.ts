@@ -1,4 +1,4 @@
-import { describe, test, beforeEach, afterEach } from "vitest";
+import { describe, test as vitest } from "vitest";
 
 import throwIfAborted from "../src/throw-if-aborted.js";
 
@@ -6,82 +6,83 @@ import throwIfAborted from "../src/throw-if-aborted.js";
 // oxlint-disable-next-line typescript/unbound-method
 const originalThrowIfAborted = AbortSignal.prototype.throwIfAborted;
 
+// oxlint-disable-next-line jest/expect-expect jest/no-disabled-tests
+const test = vitest.extend<{ noNativeThrowIfAborted?: boolean }>({
+  /**
+   * ネイティブの AbortSignal.prototype.throwIfAborted を削除した環境を提供するフィクスチャーです。
+   * ポリフィル実装の動作検証のために使用します。テスト終了後には元のメソッドを復元します。
+   */
+  // oxlint-disable-next-line no-empty-pattern
+  async noNativeThrowIfAborted({}, use) {
+    // @ts-expect-error テストのためにプロパティを一時的に削除する。
+    delete AbortSignal.prototype.throwIfAborted;
+    await use(undefined);
+    AbortSignal.prototype.throwIfAborted = originalThrowIfAborted;
+  },
+});
+
 describe.skipIf(typeof originalThrowIfAborted !== "function")("ネイティブサポート環境", () => {
   defineCommonTests();
 });
 
-describe("非サポート環境", () => {
-  beforeEach(() => {
-    // ネイティブメソッドを未定義にする。
-    // @ts-expect-error テストのためにプロパティを一時的に削除する。
-    delete AbortSignal.prototype.throwIfAborted;
-  });
-
-  afterEach(() => {
-    // プロトタイプを元の状態に戻す。
-    AbortSignal.prototype.throwIfAborted = originalThrowIfAborted;
-  });
+describe("ネイティブ非サポート環境", () => {
+  test.override({ noNativeThrowIfAborted: true });
 
   defineCommonTests();
 });
 
 function defineCommonTests(): void {
   test("引数が undefined のとき、エラーを投げずに正常終了する", ({ expect }) => {
-    // Act & Assert
+    // 実行と検証
     expect(() => throwIfAborted(undefined)).not.toThrow();
   });
 
   test("シグナルが未中止のとき、エラーを投げずに正常終了する", ({ expect }) => {
-    // Arrange
+    // 準備
     const ac = new AbortController();
-    const signal = ac.signal;
 
-    // Act & Assert
-    expect(() => throwIfAborted(signal)).not.toThrow();
+    // 実行と検証
+    expect(() => throwIfAborted(ac.signal)).not.toThrow();
   });
 
-  test("シグナルが理由なしで中止されたとき、 getAbortReason が返す AbortError の DOMException が投げられる", ({
+  test("シグナルが理由なしで中止されたとき、AbortError の DOMException が投げられる", ({
     expect,
   }) => {
-    // Arrange
+    // 準備
     const ac = new AbortController();
     ac.abort();
-    const signal = ac.signal;
 
-    // Act & Assert
-    expect(() => throwIfAborted(signal)).toThrow(DOMException);
+    // 実行と検証
+    expect(() => throwIfAborted(ac.signal)).toThrow(DOMException);
   });
 
-  test("シグナルが理由ありで中止されたとき、 getAbortReason が返すカスタムエラーオブジェクトが投げられる", ({
-    expect,
-  }) => {
-    // Arrange
+  test("シグナルが理由ありで中止されたとき、その理由がそのまま投げられる", ({ expect }) => {
+    // 準備
     const ac = new AbortController();
     const customError = new Error("Timeout");
     ac.abort(customError);
-    const signal = ac.signal;
 
-    // Act & Assert
-    expect(() => throwIfAborted(signal)).toThrow(customError);
+    // 実行と検証
+    expect(() => throwIfAborted(ac.signal)).toThrow(customError);
   });
 
   test("引数が AbortSignal 以外のオブジェクトのとき、エラーを投げずに正常終了する", ({
     expect,
   }) => {
-    // Arrange
+    // 準備
     const dummy = {} as unknown as AbortSignal;
 
-    // Act & Assert
+    // 実行と検証
     expect(() => throwIfAborted(dummy)).not.toThrow();
   });
 }
 
 describe("境界値および異常系のテスト", () => {
   test("引数が null のとき、エラーを投げずに正常終了する", ({ expect }) => {
-    // Arrange
+    // 準備
     const dummy = null as unknown as AbortSignal;
 
-    // Act & Assert
+    // 実行と検証
     expect(() => throwIfAborted(dummy)).not.toThrow();
   });
 });

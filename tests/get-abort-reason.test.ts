@@ -1,5 +1,5 @@
 import { tryCaptureStackTrace } from "try-capture-stack-trace";
-import { vi, test, beforeEach, afterEach } from "vitest";
+import { vi, test, afterEach, beforeEach } from "vitest";
 
 import getAbortReason from "../src/get-abort-reason.js";
 
@@ -9,125 +9,101 @@ vi.mock("try-capture-stack-trace", () => {
   };
 });
 
+const originalAbortController = globalThis.AbortController;
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
-
-const originalAbortController = globalThis.AbortController;
 
 afterEach(() => {
   globalThis.AbortController = originalAbortController;
 });
 
-test("未中止状態のシグナルが渡されたとき、 undefined が返される", ({ expect }) => {
-  // Arrange
+/**
+ * 指定した理由を持つ中止済みシグナルを生成する AbortController でグローバルを置き換えます。
+ * ランタイム依存のデフォルト中断理由ごとの分岐を検証するために使用します。
+ * 置き換えは afterEach フックで元に戻されます。
+ */
+function replaceAbortController(defaultReason: unknown): void {
+  globalThis.AbortController = class {
+    signal = { aborted: true, reason: defaultReason };
+    abort(): void {}
+  } as unknown as typeof AbortController;
+}
+
+test("未中止のシグナルを渡したとき、 undefined が返される", ({ expect }) => {
+  // 準備
   const ac = new AbortController();
 
-  // Act
+  // 実行
   const result = getAbortReason(ac.signal);
 
-  // Assert
+  // 検証
   expect(result).toBeUndefined();
 });
 
 test("中止済みかつ明示的な理由として TimeoutError が指定されたとき、その理由がそのまま返される", ({
   expect,
 }) => {
-  // Arrange
+  // 準備
   const ac = new AbortController();
   ac.abort("TimeoutError");
 
-  // Act
+  // 実行
   const result = getAbortReason(ac.signal);
 
-  // Assert
+  // 検証
   expect(result).toBe("TimeoutError");
 });
 
 test("中止済みかつ明示的な理由として Error オブジェクトが指定されたとき、そのオブジェクトがそのまま返される", ({
   expect,
 }) => {
-  // Arrange
+  // 準備
   const ac = new AbortController();
   const customError = new Error("Custom Error");
   ac.abort(customError);
 
-  // Act
+  // 実行
   const result = getAbortReason(ac.signal);
 
-  // Assert
+  // 検証
   expect(result).toStrictEqual(customError);
 });
 
 test("中止済みかつ理由が未定義で、ランタイムのデフォルト理由がオブジェクトのとき、そのオブジェクトが返され tryCaptureStackTrace が呼び出される", ({
   expect,
 }) => {
-  // Arrange
+  // 準備
   const mockDefaultReason = { message: "Runtime default abort reason" };
-  globalThis.AbortController = class {
-    signal = {
-      aborted: true,
-      reason: mockDefaultReason,
-    };
-    abort() {}
-  } as any;
-
+  replaceAbortController(mockDefaultReason);
   const signal = { aborted: true, reason: undefined } as unknown as AbortSignal;
 
-  // Act
+  // 実行
   const result = getAbortReason(signal);
 
-  // Assert
+  // 検証
   expect(result).toStrictEqual(mockDefaultReason);
   expect(tryCaptureStackTrace).toHaveBeenCalledWith(mockDefaultReason, getAbortReason);
 });
 
-test("中止済みかつ理由が未定義で、ランタイムのデフォルト理由が null のとき、新規の DOMException が返され tryCaptureStackTrace が呼び出される", ({
-  expect,
-}) => {
-  // Arrange
-  globalThis.AbortController = class {
-    signal = {
-      aborted: true,
-      reason: null,
-    };
-    abort() {}
-  } as any;
+test.for([
+  ["null", null],
+  ["プリミティブ値", "Primitive Abort Reason"],
+] as const)(
+  "中止済みかつ理由が未定義で、ランタイムのデフォルト理由が %s のとき、新規の AbortError DOMException が返され tryCaptureStackTrace が呼び出される",
+  ([, defaultReason], { expect }) => {
+    // 準備
+    replaceAbortController(defaultReason);
+    const signal = { aborted: true, reason: undefined } as unknown as AbortSignal;
 
-  const signal = { aborted: true, reason: undefined } as unknown as AbortSignal;
+    // 実行
+    const result = getAbortReason(signal);
 
-  // Act
-  const result = getAbortReason(signal);
-
-  // Assert
-  expect(result).toBeInstanceOf(DOMException);
-  const exception = result as DOMException;
-  expect(exception.name).toBe("AbortError");
-  expect(exception.message).toBe("Aborted");
-  expect(tryCaptureStackTrace).toHaveBeenCalledWith(exception, getAbortReason);
-});
-
-test("中止済みかつ理由が未定義で、ランタイムのデフォルト理由がプリミティブ値のとき、新規の DOMException が返され tryCaptureStackTrace が呼び出される", ({
-  expect,
-}) => {
-  // Arrange
-  globalThis.AbortController = class {
-    signal = {
-      aborted: true,
-      reason: "Primitive Abort Reason",
-    };
-    abort() {}
-  } as any;
-
-  const signal = { aborted: true, reason: undefined } as unknown as AbortSignal;
-
-  // Act
-  const result = getAbortReason(signal);
-
-  // Assert
-  expect(result).toBeInstanceOf(DOMException);
-  const exception = result as DOMException;
-  expect(exception.name).toBe("AbortError");
-  expect(exception.message).toBe("Aborted");
-  expect(tryCaptureStackTrace).toHaveBeenCalledWith(exception, getAbortReason);
-});
+    // 検証
+    expect(result).toBeInstanceOf(DOMException);
+    expect((result as DOMException).name).toBe("AbortError");
+    expect((result as DOMException).message).toBe("Aborted");
+    expect(tryCaptureStackTrace).toHaveBeenCalledWith(result, getAbortReason);
+  },
+);
