@@ -29,22 +29,22 @@
     "build": "tsc --project ./.config/tsconfig.build.json"
   },
   "dependencies": {
-    "try-capture-stack-trace": "^0.0.3"
+    "try-capture-stack-trace": "0.0.3"
   },
   "devDependencies": {
-    "@tsconfig/node24": "^24.0.4",
-    "@tsconfig/strictest": "^2.0.8",
-    "@types/node": "^24.12.2",
-    "@vitest/browser": "^4.1.5",
-    "@vitest/browser-playwright": "^4.1.5",
-    "npm-check-updates": "^22.2.0",
-    "oxfmt": "0.45.0",
-    "oxlint": "1.60.0",
-    "oxlint-tsgolint": "0.21.1",
-    "playwright": "^1.59.1",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.10",
-    "vitest": "^4.1.5"
+    "@tsconfig/node24": "24.0.5",
+    "@tsconfig/strictest": "2.0.8",
+    "@types/node": "24.13.3",
+    "@vitest/browser": "4.1.10",
+    "@vitest/browser-playwright": "4.1.10",
+    "npm-check-updates": "22.2.9",
+    "oxfmt": "0.63.0",
+    "oxlint": "1.78.0",
+    "oxlint-tsgolint": "0.25.0",
+    "playwright": "1.62.1",
+    "typescript": "7.0.2",
+    "vite": "8.2.1",
+    "vitest": "4.1.10"
   },
   "readme": "README.md"
 }
