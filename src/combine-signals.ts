@@ -10,8 +10,22 @@ export default function combineSignals(signals: readonly unknown[]): AbortSignal
   if ("any" in AbortSignal && typeof AbortSignal.any === "function") {
     // AbortSignal.any がネイティブでサポートされている場合はそれを使用します。
 
-    const signals = inputSignals.filter((signal) => signal instanceof AbortSignal);
-    return AbortSignal.any(signals);
+    // すべての要素が AbortSignal である場合が一般的として、フィルターによる配列の再生成を避けてそのまま渡します。
+    let isInvalid = false;
+    for (let i = 0; i < inputSignals.length; i++) {
+      if (!(inputSignals[i] instanceof AbortSignal)) {
+        isInvalid = true;
+        break;
+      }
+    }
+
+    if (isInvalid) {
+      const signals = inputSignals.filter((signal) => signal instanceof AbortSignal);
+      return AbortSignal.any(signals);
+    }
+
+    // AbortSignal.any は渡された配列を変更しないため、このキャストは安全です。
+    return AbortSignal.any(inputSignals as unknown as AbortSignal[]);
   } else {
     // AbortSignal.any が未実装の環境向けのポリフィル実装です。
 
