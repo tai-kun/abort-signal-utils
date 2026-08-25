@@ -13,6 +13,7 @@ run = [
   { task = "test:lint" },
   { task = "test:typecheck" },
 ]
+env = { CI = 1 }
 
 [tasks."test:server"]
 run = "npx vitest --config ./.config/vitest.server.ts"
@@ -35,7 +36,7 @@ run = [
   "npx tsc --noEmit --project ./.config/tsconfig.config.json",
 ]
 
-[tasks.fmt]
+[tasks.format]
 run = "npx oxfmt --config ./.config/.oxfmtrc.json"
 
 [tasks.lint]
@@ -43,7 +44,7 @@ run = "npx oxlint --config ./.config/.oxlintrc.json"
 
 [tasks.update]
 run = [
-  "npx npm-check-updates --target minor -u --cooldown 7 --reject oxfmt --reject oxlint --reject oxlint-tsgolint",
+  "npx npm-check-updates --target minor -u --cooldown 7",
   "pnpm install",
   "npx playwright install --with-deps",
   "pnpm audit",
