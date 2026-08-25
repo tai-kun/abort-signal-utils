@@ -66,6 +66,39 @@ function defineCommonTests(): void {
     expect(() => throwIfAborted(ac.signal)).toThrow(customError);
   });
 
+  test("シグナルが null を理由として中止されたとき、 null がそのまま投げられる", ({ expect }) => {
+    // 準備
+    const ac = new AbortController();
+    ac.abort(null);
+
+    // 実行と検証
+    let caught: unknown;
+    try {
+      throwIfAborted(ac.signal);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBe(null);
+  });
+
+  test("タイムアウトした AbortSignal.timeout のシグナルを渡すと、 TimeoutError が投げられる", async ({
+    expect,
+  }) => {
+    // 準備
+    const signal = AbortSignal.timeout(5);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // 実行と検証
+    let caught: unknown;
+    try {
+      throwIfAborted(signal);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(DOMException);
+    expect((caught as DOMException).name).toBe("TimeoutError");
+  });
+
   test("引数が AbortSignal 以外のオブジェクトのとき、エラーを投げずに正常終了する", ({
     expect,
   }) => {

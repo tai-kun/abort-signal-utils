@@ -87,6 +87,43 @@ test("中止済みかつ理由が未定義で、ランタイムのデフォル�
   expect(tryCaptureStackTrace).toHaveBeenCalledWith(mockDefaultReason, getAbortReason);
 });
 
+test("中止済みかつ理由が null のとき、 null がそのまま返される", ({ expect }) => {
+  // 準備
+  const ac = new AbortController();
+  ac.abort(null);
+
+  // 実行
+  const result = getAbortReason(ac.signal);
+
+  // 検証
+  expect(result).toBe(null);
+});
+
+test("AbortSignal.timeout で生成した未中止のシグナルを渡したとき、 undefined が返される", ({
+  expect,
+}) => {
+  // 準備
+  const signal = AbortSignal.timeout(10_000);
+
+  // 実行と検証
+  expect(getAbortReason(signal)).toBeUndefined();
+});
+
+test("AbortSignal.timeout で生成したシグナルがタイムアウトしたとき、 TimeoutError の DOMException が返される", async ({
+  expect,
+}) => {
+  // 準備
+  const signal = AbortSignal.timeout(5);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  // 実行
+  const result = getAbortReason(signal);
+
+  // 検証
+  expect(result).toBeInstanceOf(DOMException);
+  expect((result as DOMException).name).toBe("TimeoutError");
+});
+
 test.for([
   ["null", null],
   ["プリミティブ値", "Primitive Abort Reason"],
