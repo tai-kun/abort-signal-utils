@@ -20,6 +20,7 @@ export type CombineSignalsOptions = {
  * AbortSignal 以外の値は無視します。有効なシグナルが 1 つもなくても、未中断の新しいシグナルを返します。
  * AbortSignal.any がある環境ではそれに委譲します。ない環境では同等の代替実装で結合します。
  * 未中断の cleanupSignal がある場合は代替実装で結合します。
+ * AbortSignal.any がある環境で未中断の cleanupSignal を使うと代替実装に切り替わるため console.log で知らせます。
  * cleanupSignal の中断では入力の購読を止めて未中断のまま残します。
  * 中断済み入力がある場合と有効な入力がない場合は cleanupSignal に触れません。
  *
@@ -60,6 +61,13 @@ export default function combineSignals(
 
   const { cleanupSignal } = options;
   if (cleanupSignal !== undefined && !cleanupSignal.aborted) {
+    if (typeof AbortSignal.any === "function") {
+      // ネイティブがあるのに cleanupSignal で代替実装に切り替わることを知らせます。
+      console.log(
+        "combineSignals: AbortSignal.any is available, but cleanupSignal was specified, so falling back to the manual implementation.",
+      );
+    }
+
     // 未中断の cleanupSignal がある場合はネイティブを迂回して代替実装で束ねます。
     return combineManually(validSignals, cleanupSignal);
   }
