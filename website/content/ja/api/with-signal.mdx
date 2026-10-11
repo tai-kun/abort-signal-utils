@@ -1,0 +1,91 @@
+---
+title: "中断付き実行"
+description: "withSignal で処理と中断を競争させる方法です。"
+---
+
+`withSignal` は、処理の実行と中断を競争させる関数です。`Promise.race` と後片付けを 1 回の呼び出しにまとめられます。
+
+```ts
+import { withSignal } from "abort-signal-utils";
+
+await withSignal(signal, () => run());
+```
+
+上は使い捨ての最小例です。中断済みなら関数は呼ばれず、その理由で拒否されます。
+
+<TypeTable
+  type={{
+    signal: {
+      type: "AbortSignal",
+      required: true,
+      description: "競争させるシグナル。中断済みなら task を呼ばずに理由で拒否します。",
+    },
+    task: {
+      type: "() => T",
+      required: true,
+      description: "実行する関数。未中断の場合に 1 回だけ呼びます。",
+    },
+  }}
+/>
+
+## 振る舞い [#behavior]
+
+| 入力                | 結果                                                 |
+| ------------------- | ---------------------------------------------------- |
+| 中断済みのシグナル  | `task` を呼ばず、即座に理由で拒否されます。          |
+| 未中断のシグナル    | `task` を 1 回だけ呼び、処理と中断を競争させます。   |
+| `task` が先に終わる | その結果で解決し、その後は中断しても何も起きません。 |
+| 中断が先に起きる    | `task` の完了を待たずに理由で拒否されます。          |
+
+中断済みなら `task` を呼ばず、0 回のまま理由で拒否されます。
+
+未中断なら `task` を 1 回だけ呼びます。
+
+`task` 自体は止めません。
+
+`dispose` は不要で、後片付けなしで使えます。
+
+中断理由は値のまま拒否され、`Error` は同一インスタンス、`null` や `0` もそのまま届き、理由なしの中断では既定の `AbortError` が届きます。
+
+`task` の戻り値は `await` されて返り、`task` が投げた理由はそのまま届きます。
+
+```ts
+const controller = new AbortController();
+controller.abort("stop");
+
+await expect(withSignal(controller.signal, () => run())).rejects.toBe("stop");
+// run は呼ばれません。
+```
+
+:::warning
+`task` は中断しても止まりません。止めたい処理には `signal` を渡して、中断に連動させてください。
+:::
+
+:::warning
+`task` が終わらず中断も起きないと、永遠に待ち続けます。終わる保証のある処理と組にしてください。
+:::
+
+中断後は中断待ちの購読は残りません。
+
+## よくある使い方 [#recipes]
+
+### 処理と中断を競争させる [#race]
+
+```ts
+await withSignal(signal, () => fetch("/api/items", { signal }));
+```
+
+`fetch` のように `signal` を受けられる関数は、そのまま渡すと中断に連動して止まります。受けられない待ちと組むときも、呼び出しは 1 行で済みます。
+
+### 後片付けを中断に連動させる [#cleanup]
+
+```ts
+try {
+  await withSignal(signal, () => job());
+} catch (reason) {
+  await release();
+  throw reason;
+}
+```
+
+中断理由は値のまま拒否されるため、後片付けの後に再送出して呼び出し元に伝えます。

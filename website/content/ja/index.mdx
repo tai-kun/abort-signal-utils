@@ -25,13 +25,14 @@ description: "AbortSignal 関連の小さなユーティリティーです。"
 | 中断理由を取り出す | `getAbortReason` |
 | 中断済みなら理由を投げる | `throwIfAborted` |
 | 中断を `Promise` として待つ | `toAbortPromise` |
+| 処理と中断を競争させる | `withSignal` |
 
-いずれも `AbortSignal` 以外の値を渡しても壊れません。`undefined` や `null` が混ざりうる引数は、そのまま配列や引数に入れてください。選別や分岐は不要です。
+`withSignal` を除き、いずれも `AbortSignal` 以外の値を渡しても壊れません。`undefined` や `null` が混ざりうる引数は、そのまま配列や引数に入れてください。選別や分岐は不要です。`withSignal` の `signal` には `AbortSignal` を渡してください。
 
 ## 最小例 [#quick-example]
 
 ```ts
-import { combineSignals, throwIfAborted, toAbortPromise } from "abort-signal-utils";
+import { combineSignals, throwIfAborted, toAbortPromise, withSignal } from "abort-signal-utils";
 
 const userController = new AbortController();
 const combined = combineSignals([userController.signal, AbortSignal.timeout(5_000)]);
@@ -47,6 +48,14 @@ async function run(signal: AbortSignal): Promise<void> {
 
 中断理由は文字列や `Error` だけでなく、`null` や `0` などの falsy な値もそのまま引き継ぎます。値の有無ではなく、中断した事実で分岐してください。
 
+実行まで含めて競争させる場合は `withSignal` を使います。
+
+```ts
+import { withSignal } from "abort-signal-utils";
+
+await withSignal(signal, () => job());
+```
+
 ## インストール [#install]
 
 ```package-install
@@ -60,6 +69,7 @@ import {
   getAbortReason,
   throwIfAborted,
   toAbortPromise,
+  withSignal,
 } from "abort-signal-utils";
 ```
 

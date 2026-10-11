@@ -93,6 +93,20 @@ try {
 }
 ```
 
+## 実行まで含めて競争させる [#race-with-signal]
+
+`Promise.race` と後片付けをまとめたい場合は `withSignal` を使います。中断済みなら関数を呼ばず、後片付けも不要です。詳しくは [中断付き実行](/api/with-signal) を参照してください。
+
+```ts
+import { withSignal } from "abort-signal-utils";
+
+await withSignal(signal, () => job());
+```
+
+:::warning
+`task` は中断しても止まりません。止めたい処理には `signal` を渡して、中断に連動させてください。
+:::
+
 ## ホットパスで割り当てを削る [#fast-path]
 
 単一シグナルが多い経路では `combineSignalsFast` に置き換えます。有効な入力が 1 つだけなら割り当てなしで返します。

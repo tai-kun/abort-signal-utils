@@ -12,3 +12,6 @@ export { default as throwIfAborted } from "./throw-if-aborted.js";
 
 export type * from "./to-abort-promise.js";
 export { default as toAbortPromise } from "./to-abort-promise.js";
+
+export type * from "./with-signal.js";
+export { default as withSignal } from "./with-signal.js";

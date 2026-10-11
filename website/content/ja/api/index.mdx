@@ -1,9 +1,9 @@
 ---
 title: "API 一覧"
-description: "5 つの関数の仕様と使い分けを 1 ページで見渡します。"
+description: "6 つの関数の仕様と使い分けを 1 ページで見渡します。"
 ---
 
-5 つの関数は役割が重なりません。やりたいことから 1 つを選んでください。共通の前提（非シグナルの扱いや理由の保持）は、このページの末尾にまとめています。
+6 つの関数は役割が重なりません。やりたいことから 1 つを選んでください。共通の前提（非シグナルの扱いや理由の保持）は、このページの末尾にまとめています。
 
 ## 一覧 [#overview]
 
@@ -14,6 +14,7 @@ description: "5 つの関数の仕様と使い分けを 1 ページで見渡し�
 | `getAbortReason` | `(signal: AbortSignal) => unknown` | 理由を取り出します。投げません。 |
 | `throwIfAborted` | `(signal: unknown) => void` | 中断済みなら理由を投げます。 |
 | `toAbortPromise` | `(signal: unknown, options?: ToAbortPromiseOptions) => AbortPromiseLike` | 中断を待てる `Promise` にします。 |
+| `withSignal` | `(signal: AbortSignal, task: () => T) => Promise<Awaited<T>>` | 処理と中断を競争させます。 |
 
 ## 使い分け [#which-to-use]
 
@@ -49,15 +50,18 @@ await next();
 
 詳しくは [中断の検査](/api/inspect-abort) を参照してください。
 
-### 待機は 1 択 [#wait]
+### 待機と実行 [#wait]
 
 中断を `await` や `Promise.race` に組み込みたい場合は `toAbortPromise` を使います。成功では解決せず、中断時に理由で拒否されます。待ちが不要になったら `dispose` で購読を解除できます。詳しくは [中断の待機](/api/to-abort-promise) を、後始末の手順は [購読の解除](/api/to-abort-promise#unsubscribe) を参照してください。
+
+処理の実行まで含めて競争させたい場合は `withSignal` を使います。中断済みなら関数を呼ばず、未中断なら 1 回だけ呼んで中断と競争させます。後片付けは不要です。詳しくは [中断付き実行](/api/with-signal) を参照してください。
 
 ## 共通の約束 [#shared-rules]
 
 個々のページを読む前に、ここだけ押さえてください。
 
-- `combineSignals` 系、`throwIfAborted`、`toAbortPromise` は `AbortSignal` 以外を無視します。任意の signal 引数は選別せずに渡せます。
+- `withSignal` を除き、`combineSignals` 系、`throwIfAborted`、`toAbortPromise` は `AbortSignal` 以外を無視します。任意の signal 引数は選別せずに渡せます。
+- `withSignal` の `signal` には `AbortSignal` を渡してください。中断済みなら関数を呼ばずに理由で拒否されます。
 - 中断理由は値のまま引き継ぎます。`null` や `0` も潰さず、`Error` は同一インスタンスを保ちます。
 - 理由なしの中断では、実行環境の既定の `AbortError`（`DOMException`）を使います。理由が `undefined` のまま中断している稀な状態では、代替の `AbortError` を生成します。
 - `combineSignals` は呼び出すたびに独立した新しいシグナルを返し、入力配列は変更しません。
@@ -71,5 +75,8 @@ await next();
   </Card>
   <Card title="中断の待機" href="/api/to-abort-promise" icon="hourglass">
     toAbortPromise の仕様を読みます。
+  </Card>
+  <Card title="中断付き実行" href="/api/with-signal" icon="play">
+    withSignal の仕様を読みます。
   </Card>
 </CardGroup>

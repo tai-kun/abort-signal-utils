@@ -7,6 +7,7 @@ import * as entrypoint from "../src/index.js";
 import throwIfAborted from "../src/throw-if-aborted.js";
 import toAbortPromise from "../src/to-abort-promise.js";
 import type { AbortPromiseLike, ToAbortPromiseOptions } from "../src/to-abort-promise.js";
+import withSignal from "../src/with-signal.js";
 
 test("各関数を再エクスポートする", ({ expect }) => {
   // 検証
@@ -15,6 +16,7 @@ test("各関数を再エクスポートする", ({ expect }) => {
   expect(entrypoint.getAbortReason).toBe(getAbortReason);
   expect(entrypoint.throwIfAborted).toBe(throwIfAborted);
   expect(entrypoint.toAbortPromise).toBe(toAbortPromise);
+  expect(entrypoint.withSignal).toBe(withSignal);
 });
 
 test("toAbortPromiseの型の契約を満たす", () => {
@@ -24,4 +26,21 @@ test("toAbortPromiseの型の契約を満たす", () => {
   expectTypeOf<AbortPromiseLike>().toMatchTypeOf<Disposable>();
   expectTypeOf<AbortPromiseLike["dispose"]>().toEqualTypeOf<() => void>();
   expectTypeOf<ToAbortPromiseOptions["cleanupSignal"]>().toEqualTypeOf<AbortSignal | undefined>();
+});
+
+test("withSignalの型の契約を満たす", () => {
+  // 検証
+  expectTypeOf(withSignal).parameter(0).toEqualTypeOf<AbortSignal>();
+  expectTypeOf(
+    withSignal(new AbortController().signal, () => Promise.resolve("ok")),
+  ).resolves.toEqualTypeOf<string>();
+  expectTypeOf(
+    withSignal(
+      new AbortController().signal,
+      () =>
+        new Promise<Promise<number>>((resolve) => {
+          resolve(Promise.resolve(42));
+        }),
+    ),
+  ).resolves.toEqualTypeOf<number>();
 });
