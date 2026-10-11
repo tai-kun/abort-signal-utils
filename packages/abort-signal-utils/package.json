@@ -1,7 +1,7 @@
 {
   "name": "abort-signal-utils",
   "version": "0.0.0",
-  "description": "",
+  "description": "Tiny ESM utilities for AbortSignal: combine signals, inspect abortion, timeout, and race with abort.",
   "homepage": "https://tai-kun.github.io/abort-signal-utils",
   "license": "MIT",
   "repository": {
