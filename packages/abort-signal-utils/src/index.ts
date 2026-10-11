@@ -10,6 +10,9 @@ export { default as getAbortReason } from "./get-abort-reason.js";
 export type * from "./throw-if-aborted.js";
 export { default as throwIfAborted } from "./throw-if-aborted.js";
 
+export type * from "./timeout-signal.js";
+export { default as timeoutSignal } from "./timeout-signal.js";
+
 export type * from "./to-abort-promise.js";
 export { default as toAbortPromise } from "./to-abort-promise.js";
 

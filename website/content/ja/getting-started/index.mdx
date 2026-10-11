@@ -17,10 +17,10 @@ description: "インストールから結合・検査・待機の基本操作ま
     ユーザー操作とタイムアウトなど、複数の中断元を `combineSignals` で 1 つにします。
 
     ```ts
-    import { combineSignals } from "abort-signal-utils";
+    import { combineSignals, timeoutSignal } from "abort-signal-utils";
 
     const stop = new AbortController();
-    const combined = combineSignals([stop.signal, AbortSignal.timeout(5_000)]);
+    const combined = combineSignals([stop.signal, timeoutSignal(5_000)]);
 
     await fetch("/api/items", { signal: combined });
     ```
@@ -66,7 +66,7 @@ description: "インストールから結合・検査・待機の基本操作ま
 
 <CardGroup cols={2}>
   <Card title="API 一覧" href="/api" icon="book-open">
-    5 つの関数の仕様と使い分けを確認します。
+    7 つの関数の仕様と使い分けを確認します。
   </Card>
   <Card title="実践レシピ" href="/guides" icon="cooking-pot">
     タイムアウトや複合中断の実例を見ます。

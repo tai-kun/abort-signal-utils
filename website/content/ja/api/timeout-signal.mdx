@@ -1,0 +1,137 @@
+---
+title: "タイムアウト"
+description: "timeoutSignal で指定時間後に中断するシグナルを作る方法です。"
+---
+
+`timeoutSignal` は、指定時間後に中断する新しい `AbortSignal` を返します。`fetch` のタイムアウトや `combineSignals` との併用に使えます。
+
+```ts
+import { timeoutSignal } from "abort-signal-utils";
+
+await fetch("/api/items", { signal: timeoutSignal(5_000) });
+```
+
+上は使い捨ての最小例です。作ったシグナルを取り消す手段はないため、タイマーが不要になったら[後始末](#cleanup)で止めてください。
+
+<TypeTable
+  type={{
+    ms: {
+      type: "number",
+      required: true,
+      description: "待機時間（ミリ秒）。0 から Number.MAX_SAFE_INTEGER までの整数を受け付けます。",
+    },
+    options: {
+      type: "TimeoutSignalOptions",
+      description: "中断理由と後始末の選択肢。reason と cleanupSignal 以外は無視します。",
+    },
+  }}
+/>
+
+## 振る舞い [#behavior]
+
+| 入力 | 結果 |
+| --- | --- |
+| `ms` が数値以外 | `TypeError` を投げます。 |
+| `ms` が小数・負数・`NaN`・`Infinity`・上限超え | `RangeError` を投げます。 |
+| 呼び出し直後 | 未中断で返ります。`ms` が `0` でも次のティックで中断します。 |
+| 時間の経過 | 既定では `TimeoutError` の `DOMException` で中断します。 |
+| `reason` の指定 | その値のまま中断します。`null` や `0` などの falsy な値も潰しません。 |
+| `reason` の省略・`undefined` | 既定の `TimeoutError` で中断します。 |
+| `cleanupSignal` の中断 | タイマーを止めて未中断のまま残ります。以後、時間が来ても中断しません。 |
+| 中断済みの `cleanupSignal` | タイマーを作らず、未中断で返ります。 |
+| タイマー発火と `cleanupSignal` の中断の競合 | 先に起きた方が勝ちます。発火後の `cleanupSignal` の中断は何もしません。 |
+| 複数回の呼び出し | 互いに干渉しない独立したシグナルを返します。 |
+
+既定理由の `name` は `TimeoutError` で、`message` は `The operation was aborted due to timeout` です。`DOMException` として作られるため、`catch` 側で名前から判別できます。
+
+```ts
+const signal = timeoutSignal(5_000);
+console.log(signal.aborted); // false（直後は未中断）
+
+await new Promise((resolve) => setTimeout(resolve, 5_000));
+console.log(signal.aborted); // true
+console.log(signal.reason.name); // "TimeoutError"
+```
+
+中断理由を変えたい場合は、`reason` を渡します。
+
+```ts
+const signal = timeoutSignal(5_000, { reason: "too-slow" });
+// 時間が来ると reason は "too-slow" になります。
+```
+
+:::warning
+作ったシグナルを取り消す手段はありません。唯一の例外は `cleanupSignal` の中断でタイマーを止められる点です。結果自体を未中断に戻すことはできません。
+:::
+
+## よくある使い方 [#recipes]
+
+### fetch にタイムアウトを付ける [#fetch-timeout]
+
+```ts
+import { timeoutSignal } from "abort-signal-utils";
+
+await fetch("/api/items", { signal: timeoutSignal(5_000) });
+```
+
+`fetch` のように `signal` を受けられる関数は、そのまま渡すと時間切れで止まります。理由を判別したい場合は、拒否理由の `name` が `TimeoutError` かを見てください。
+
+```ts
+try {
+  await fetch("/api/items", { signal: timeoutSignal(5_000) });
+} catch (reason) {
+  if (reason instanceof DOMException && reason.name === "TimeoutError") {
+    console.log("タイムアウトしました。");
+  }
+  throw reason;
+}
+```
+
+### ユーザー操作とタイムアウトを束ねる [#combine]
+
+```ts
+import { combineSignals, timeoutSignal } from "abort-signal-utils";
+
+const combined = combineSignals([userSignal, timeoutSignal(5_000)]);
+
+await fetch("/api/items", { signal: combined });
+```
+
+ユーザー操作と時間切れのどちらが先に起きても中断します。先に中断した方の理由が残るため、どちらで止まったかは `reason` から判別できます。
+
+### タイマーの後始末をする [#cleanup]
+
+```ts
+import { timeoutSignal } from "abort-signal-utils";
+
+const cleanup = new AbortController();
+const signal = timeoutSignal(60_000, { cleanupSignal: cleanup.signal });
+
+try {
+  await fetch("/api/items", { signal });
+} finally {
+  // 処理が終わったらタイマーを止めます。
+  // signal は未中断のまま残り、以後の発火は起きません。
+  cleanup.abort();
+}
+```
+
+タイムアウト前に処理が終わることが多い場合は、この形でタイマーを止めてください。長時間待つ場合も同様です。
+
+:::tip
+中断済みの `cleanupSignal` を渡すと、最初からタイマーを作りません。使い回しの合図を渡す場合も安全です。
+:::
+
+## 実装の注意 [#notes]
+
+実用的な範囲の時間で使ってください。上限の `Number.MAX_SAFE_INTEGER` まで受け付けます。ただし上限いっぱいの完走には約 400 万回の再予約が必要になり、現実的ではありません。大きな値は内部で分割して待ちます。
+
+タイマーが不要になったら、`cleanupSignal` の中断で後始末してください。結果が未中断の間はタイマーの購読が残ります。
+
+`AbortSignal.timeout` がある環境では、`reason` も `cleanupSignal` も指定せず時間が実用的な範囲なら委譲します。ない環境では代替実装で動きます。`reason` や `cleanupSignal` を指定したときは、どの環境でも同じ代替実装で動きます。
+
+ネイティブの `AbortSignal.timeout` との差分は次の 3 点です。
+
+- `reason` と `cleanupSignal` を指定できます。
+- 上限は `Number.MAX_SAFE_INTEGER` まで受け付けます。
+- デバッガーなどで停止しても時間補正はなく、経過時間で中断します。

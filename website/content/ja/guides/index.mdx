@@ -7,18 +7,18 @@ description: "fetch のタイムアウトや複数の中断元の束ね方など
 
 ## fetch にタイムアウトを付ける [#fetch-timeout]
 
-`AbortSignal.timeout` と `combineSignals` を組むのが最短です。
+`timeoutSignal` と `combineSignals` を組むのが最短です。
 
 ```ts
-import { combineSignals } from "abort-signal-utils";
+import { combineSignals, timeoutSignal } from "abort-signal-utils";
 
 const response = await fetch("/api/items", {
-  signal: combineSignals([userSignal, AbortSignal.timeout(5_000)]),
+  signal: combineSignals([userSignal, timeoutSignal(5_000)]),
 });
 ```
 
 :::tip
-タイムアウト単体なら `AbortSignal.timeout(5_000)` を直接渡せます。`combineSignals` が要るのは、ユーザー操作など 2 つ以上の元を束ねるときだけです。
+タイムアウト単体なら `timeoutSignal(5_000)` を直接渡せます。`combineSignals` が要るのは、ユーザー操作など 2 つ以上の元を束ねるときだけです。
 :::
 
 ## ユーザー操作とタイムアウトを両立する [#combine-sources]
@@ -26,10 +26,10 @@ const response = await fetch("/api/items", {
 任意の中断元は選別せずに渡せます。`undefined` のまま混ぜても壊れません。
 
 ```ts
-import { combineSignals } from "abort-signal-utils";
+import { combineSignals, timeoutSignal } from "abort-signal-utils";
 
 async function load(userSignal?: AbortSignal): Promise<Response> {
-  const signal = combineSignals([userSignal, AbortSignal.timeout(5_000)]);
+  const signal = combineSignals([userSignal, timeoutSignal(5_000)]);
   return fetch("/api/items", { signal });
 }
 ```
@@ -112,10 +112,10 @@ await withSignal(signal, () => job());
 単一シグナルが多い経路では `combineSignalsFast` に置き換えます。有効な入力が 1 つだけなら割り当てなしで返します。
 
 ```ts
-import { combineSignalsFast } from "abort-signal-utils";
+import { combineSignalsFast, timeoutSignal } from "abort-signal-utils";
 
 function bind(signal?: AbortSignal): AbortSignal {
-  return combineSignalsFast([signal, AbortSignal.timeout(5_000)]);
+  return combineSignalsFast([signal, timeoutSignal(5_000)]);
 }
 ```
 

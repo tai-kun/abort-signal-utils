@@ -24,6 +24,7 @@ description: "AbortSignal 関連の小さなユーティリティーです。"
 | 複数のシグナルを 1 つにまとめる | `combineSignals` / `combineSignalsFast` |
 | 中断理由を取り出す | `getAbortReason` |
 | 中断済みなら理由を投げる | `throwIfAborted` |
+| 指定時間後に中断するシグナルを作る | `timeoutSignal` |
 | 中断を `Promise` として待つ | `toAbortPromise` |
 | 処理と中断を競争させる | `withSignal` |
 
@@ -32,10 +33,10 @@ description: "AbortSignal 関連の小さなユーティリティーです。"
 ## 最小例 [#quick-example]
 
 ```ts
-import { combineSignals, throwIfAborted, toAbortPromise, withSignal } from "abort-signal-utils";
+import { combineSignals, throwIfAborted, timeoutSignal, toAbortPromise, withSignal } from "abort-signal-utils";
 
 const userController = new AbortController();
-const combined = combineSignals([userController.signal, AbortSignal.timeout(5_000)]);
+const combined = combineSignals([userController.signal, timeoutSignal(5_000)]);
 
 async function run(signal: AbortSignal): Promise<void> {
   throwIfAborted(signal); // 中断済みならここで理由を投げます。
@@ -68,6 +69,7 @@ import {
   combineSignalsFast,
   getAbortReason,
   throwIfAborted,
+  timeoutSignal,
   toAbortPromise,
   withSignal,
 } from "abort-signal-utils";
@@ -77,4 +79,6 @@ ESM 専用で、副作用はありません。バンドラーでも Node.js で�
 
 ## 対応環境 [#compatibility]
 
-`AbortSignal.any` と `AbortSignal.prototype.throwIfAborted` がある環境ではネイティブ実装に委譲し、ない環境では同等の代替実装で動きます。実行のたびに有無を判定するため、ポリフィルを後から足してもそのまま使えます。
+`AbortSignal.any` と `AbortSignal.prototype.throwIfAborted` がある環境ではネイティブ実装に委譲します。ない環境では同等の代替実装で動きます。実行のたびに有無を判定するため、ポリフィルを後から足してもそのまま使えます。
+
+`timeoutSignal` は `AbortSignal.timeout` がある環境では条件付きで委譲します。ない環境では代替実装で動きます。

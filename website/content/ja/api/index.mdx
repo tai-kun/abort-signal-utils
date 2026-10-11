@@ -1,9 +1,9 @@
 ---
 title: "API 一覧"
-description: "6 つの関数の仕様と使い分けを 1 ページで見渡します。"
+description: "7 つの関数の仕様と使い分けを 1 ページで見渡します。"
 ---
 
-6 つの関数は役割が重なりません。やりたいことから 1 つを選んでください。共通の前提（非シグナルの扱いや理由の保持）は、このページの末尾にまとめています。
+7 つの関数は役割が重なりません。やりたいことから 1 つを選んでください。共通の前提（非シグナルの扱いや理由の保持）は、このページの末尾にまとめています。
 
 ## 一覧 [#overview]
 
@@ -11,6 +11,7 @@ description: "6 つの関数の仕様と使い分けを 1 ページで見渡し�
 | --- | --- | --- |
 | `combineSignals` | `(signals: readonly unknown[], options?: CombineSignalsOptions) => AbortSignal` | 複数を束ねて、新しいシグナルを作ります。 |
 | `combineSignalsFast` | `(signals: readonly unknown[], options?: CombineSignalsOptions) => AbortSignal` | 単一なら割り当てなしで返します。 |
+| `timeoutSignal` | `(ms: number, options?: TimeoutSignalOptions) => AbortSignal` | 指定時間後に中断するシグナルを作ります。 |
 | `getAbortReason` | `(signal: AbortSignal) => unknown` | 理由を取り出します。投げません。 |
 | `throwIfAborted` | `(signal: unknown) => void` | 中断済みなら理由を投げます。 |
 | `toAbortPromise` | `(signal: unknown, options?: ToAbortPromiseOptions) => AbortPromiseLike` | 中断を待てる `Promise` にします。 |
@@ -56,19 +57,24 @@ await next();
 
 処理の実行まで含めて競争させたい場合は `withSignal` を使います。中断済みなら関数を呼ばず、未中断なら 1 回だけ呼んで中断と競争させます。後片付けは不要です。詳しくは [中断付き実行](/api/with-signal) を参照してください。
 
+指定時間後に中断するシグナルが要る場合は `timeoutSignal` を使います。詳しくは [タイムアウト](/api/timeout-signal) を参照してください。
+
 ## 共通の約束 [#shared-rules]
 
 個々のページを読む前に、ここだけ押さえてください。
 
-- `withSignal` を除き、`combineSignals` 系、`throwIfAborted`、`toAbortPromise` は `AbortSignal` 以外を無視します。任意の signal 引数は選別せずに渡せます。
+- `withSignal` を除き、`combineSignals` 系、`throwIfAborted`、`toAbortPromise` と `timeoutSignal` の `cleanupSignal` は `AbortSignal` 以外を無視します。任意の signal 引数は選別せずに渡せます。ただし `timeoutSignal` の `ms` は例外で、不正な値はすぐに投げます。
 - `withSignal` の `signal` には `AbortSignal` を渡してください。中断済みなら関数を呼ばずに理由で拒否されます。
-- 中断理由は値のまま引き継ぎます。`null` や `0` も潰さず、`Error` は同一インスタンスを保ちます。
-- 理由なしの中断では、実行環境の既定の `AbortError`（`DOMException`）を使います。理由が `undefined` のまま中断している稀な状態では、代替の `AbortError` を生成します。
+- 中断理由は値のまま引き継ぎます。`null` や `0` などの falsy な値も潰さず、`Error` は同一インスタンスを保ちます。
+- 理由なしの中断では、実行環境の既定の `AbortError`（`DOMException`）を使います。理由が `undefined` のまま中断している稀な状態では、代替の `AbortError` を生成します。ただし `timeoutSignal` の既定は `TimeoutError`（`DOMException`）です。
 - `combineSignals` は呼び出すたびに独立した新しいシグナルを返し、入力配列は変更しません。
 
 <CardGroup cols={3}>
   <Card title="シグナルの結合" href="/api/combine-signals" icon="merge">
     combineSignals と Fast の仕様を読みます。
+  </Card>
+  <Card title="タイムアウト" href="/api/timeout-signal" icon="timer">
+    timeoutSignal の仕様を読みます。
   </Card>
   <Card title="中断の検査" href="/api/inspect-abort" icon="search-check">
     getAbortReason と throwIfAborted を読みます。

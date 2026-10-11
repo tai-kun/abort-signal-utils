@@ -5,6 +5,8 @@ import combineSignals from "../src/combine-signals.js";
 import getAbortReason from "../src/get-abort-reason.js";
 import * as entrypoint from "../src/index.js";
 import throwIfAborted from "../src/throw-if-aborted.js";
+import timeoutSignal from "../src/timeout-signal.js";
+import type { TimeoutSignalOptions } from "../src/timeout-signal.js";
 import toAbortPromise from "../src/to-abort-promise.js";
 import type { AbortPromiseLike, ToAbortPromiseOptions } from "../src/to-abort-promise.js";
 import withSignal from "../src/with-signal.js";
@@ -15,6 +17,7 @@ test("各関数を再エクスポートする", ({ expect }) => {
   expect(entrypoint.combineSignalsFast).toBe(combineSignalsFast);
   expect(entrypoint.getAbortReason).toBe(getAbortReason);
   expect(entrypoint.throwIfAborted).toBe(throwIfAborted);
+  expect(entrypoint.timeoutSignal).toBe(timeoutSignal);
   expect(entrypoint.toAbortPromise).toBe(toAbortPromise);
   expect(entrypoint.withSignal).toBe(withSignal);
 });
@@ -26,6 +29,12 @@ test("toAbortPromiseの型の契約を満たす", () => {
   expectTypeOf<AbortPromiseLike>().toMatchTypeOf<Disposable>();
   expectTypeOf<AbortPromiseLike["dispose"]>().toEqualTypeOf<() => void>();
   expectTypeOf<ToAbortPromiseOptions["cleanupSignal"]>().toEqualTypeOf<AbortSignal | undefined>();
+});
+
+test("timeoutSignalの型の契約を満たす", () => {
+  // 検証
+  expectTypeOf<TimeoutSignalOptions["reason"]>().toEqualTypeOf<unknown>();
+  expectTypeOf<TimeoutSignalOptions["cleanupSignal"]>().toEqualTypeOf<AbortSignal | undefined>();
 });
 
 test("withSignalの型の契約を満たす", () => {

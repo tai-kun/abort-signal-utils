@@ -57,8 +57,10 @@ const combined: AbortSignal = combineSignals(signals, options);
 - `cleanupSignal` が未指定・中断済みの場合は、従来どおり入力のみを束ねます。中断済みの `cleanupSignal` を渡しても、入力への購読は通常どおり残ります。入力と `cleanupSignal` に同一のオブジェクトを渡した場合、中断時は入力として扱います。
 
 ```ts
+import { combineSignals, timeoutSignal } from "abort-signal-utils";
+
 const stop = new AbortController();
-const combined = combineSignals([stop.signal, AbortSignal.timeout(5_000), undefined]);
+const combined = combineSignals([stop.signal, timeoutSignal(5_000), undefined]);
 
 stop.abort("user-stop"); // combined.reason は "user-stop" になります。
 ```
@@ -70,10 +72,10 @@ stop.abort("user-stop"); // combined.reason は "user-stop" になります。
 結合の後始末を別のシグナルに連動させる場合は、`cleanupSignal` を渡します。結合が不要になった合図で中断してください。
 
 ```ts
-import { combineSignals } from "abort-signal-utils";
+import { combineSignals, timeoutSignal } from "abort-signal-utils";
 
 const cleanup = new AbortController();
-const combined = combineSignals([userSignal, AbortSignal.timeout(5_000)], {
+const combined = combineSignals([userSignal, timeoutSignal(5_000)], {
   cleanupSignal: cleanup.signal,
 });
 
