@@ -1,11 +1,7 @@
 import getAbortReason from "./get-abort-reason.js";
 
 /**
- * 中断済みなら中断理由を投げます。
- *
- * AbortSignal 以外の値は、何もせずに無視します。AbortSignal.prototype.throwIfAborted がある環境ではそれに委譲します。ない環境では中断理由を直接投げます。
- *
- * @param signal 調べる値です。AbortSignal 以外なら何もしません。
+ * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/inspect-abort#throw-if-aborted)
  */
 export default function throwIfAborted(signal: unknown): void {
   if (signal instanceof AbortSignal) {

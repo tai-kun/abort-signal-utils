@@ -2,17 +2,7 @@ import combineSignals from "./combine-signals.js";
 import type { CombineSignalsOptions } from "./combine-signals.js";
 
 /**
- * 有効なシグナルが 1 つだけならそれ自体を返す combineSignals の亜種です。
- *
- * 有効な AbortSignal が 1 つだけなら、新しいシグナルを作らずにそれ自体を返します。有効なシグナルがなければ未中断の新しいシグナルを返します。2 つ以上あれば combineSignals に委譲します。
- * 単一または空の経路では cleanupSignal に触れません。
- * 単一の未中断と未中断の cleanupSignal がある場合は新規オブジェクトで結合します。
- *
- * @param signals 結合する値の配列です。AbortSignal 以外は無視します。
- * @param options 結合の選択肢です。cleanupSignal 以外は無視します。
- * @returns 結合した AbortSignal です。入力と同じオブジェクトの場合があります。
- *
- * 返されたシグナルへの変更は元のシグナルにも波及します。独立したオブジェクトが必要なら combineSignals を使ってください。
+ * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/combine-signals#combine-signals-fast)
  */
 export default function combineSignalsFast(
   signals: readonly unknown[],

@@ -1,12 +1,7 @@
 import { tryCaptureStackTrace } from "try-capture-stack-trace";
 
 /**
- * AbortSignal の中断理由を取り出します。
- *
- * 未中断なら undefined を返します。中断済みにもかかわらず理由が undefined である稀な場合のみ、代替の AbortError を生成して返します。
- *
- * @param signal 中断理由を取り出す AbortSignal です。
- * @returns 中断理由です。未中断なら undefined です。
+ * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/inspect-abort#get-abort-reason)
  */
 export default function getAbortReason(signal: AbortSignal): unknown {
   if (!signal.aborted) {

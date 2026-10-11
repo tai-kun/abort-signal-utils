@@ -1,32 +1,15 @@
 /**
- * 結合の選択肢です。
+ * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/combine-signals)
  */
 export type CombineSignalsOptions = {
   /**
-   * 結合の購読を止める合図です。
-   *
-   * 中断されると入力の購読を止めます。
-   *
-   * 結果は未中断のまま残ります。
-   *
-   * 中断済みなら最初から購読しません。
+   * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/combine-signals)
    */
   readonly cleanupSignal?: AbortSignal | undefined;
 };
 
 /**
- * 複数の AbortSignal を 1 つにまとめます。
- *
- * AbortSignal 以外の値は無視します。有効なシグナルが 1 つもなくても、未中断の新しいシグナルを返します。
- * AbortSignal.any がある環境ではそれに委譲します。ない環境では同等の代替実装で結合します。
- * 未中断の cleanupSignal がある場合は代替実装で結合します。
- * AbortSignal.any がある環境で未中断の cleanupSignal を使うと代替実装に切り替わるため console.log で知らせます。
- * cleanupSignal の中断では入力の購読を止めて未中断のまま残します。
- * 中断済み入力がある場合と有効な入力がない場合は cleanupSignal に触れません。
- *
- * @param signals 結合する値の配列です。AbortSignal 以外は無視します。
- * @param options 結合の選択肢です。cleanupSignal 以外は無視します。
- * @returns 結合した新しい AbortSignal です。
+ * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/combine-signals#combine-signals)
  */
 export default function combineSignals(
   signals: readonly unknown[],

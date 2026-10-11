@@ -1,20 +1,14 @@
 /**
- * timeoutSignal の選択肢です。
+ * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/timeout-signal)
  */
 export type TimeoutSignalOptions = {
   /**
-   * 中断理由です。
-   *
-   * 省略時は `TimeoutError` の `DOMException` で中断します。
+   * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/timeout-signal)
    */
   // oxlint-disable-next-line typescript/no-redundant-type-constituents -- unknown と undefined の併記で選択肢の形状を統一します。
   readonly reason?: unknown | undefined;
   /**
-   * タイマーの購読を止める合図です。
-   *
-   * 中断されるとタイマーを止めて未中断のまま残します。
-   *
-   * 中断済みなら最初からタイマーを作りません。
+   * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/timeout-signal#cleanup)
    */
   readonly cleanupSignal?: AbortSignal | undefined;
 };
@@ -24,23 +18,7 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
 const MAX_DELEGATABLE_MS = 4_294_967_295;
 
 /**
- * 指定時間後に中断するシグナルを作ります。
- *
- * `ms` には `0` から `Number.MAX_SAFE_INTEGER` までの整数を受け付けます。
- *
- * `reason` 省略時は `TimeoutError` の `DOMException` で中断します。
- *
- * `cleanupSignal` が中断されるとタイマーを止めて未中断のまま残します。
- *
- * 中断済みの `cleanupSignal` ではタイマーを作らず未中断のまま残します。
- *
- * 作ったシグナルを取り消す手段はありません。
- *
- * 長時間タイマーは購読を保持し続けるため `cleanupSignal` での後始末を検討してください。
- *
- * @param ms 待機時間（ミリ秒）です。
- * @param options 中断理由と後始末の指定です。
- * @returns 指定時間後に中断するシグナルを返します。
+ * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/timeout-signal)
  */
 export default function timeoutSignal(ms: number, options: TimeoutSignalOptions = {}): AbortSignal {
   if (typeof ms !== "number") {
