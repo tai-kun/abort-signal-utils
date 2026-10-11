@@ -1,5 +1,13 @@
 # Changelog
 
+## abort-signal-utils@0.0.6
+
+### ドキュメント
+
+- ドキュメントリンクに紐付け ([859cbdb](https://github.com/tai-kun/abort-signal-utils/commit/859cbdb586c24e86f4e930420b6398596b79f719))
+
+**Full Changelog**: https://github.com/tai-kun/abort-signal-utils/compare/abort-signal-utils@0.0.5...abort-signal-utils@0.0.6
+
 ## abort-signal-utils@0.0.5
 
 ### 新機能
