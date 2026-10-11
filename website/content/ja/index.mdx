@@ -1,0 +1,70 @@
+---
+title: "Abort Signal Utils"
+description: "AbortSignal 関連の小さなユーティリティーです。"
+---
+
+`AbortSignal` の定型処理を切り出した、小さな ESM ライブラリーです。複数のシグナルを 1 つに束ねる、中断済みかどうかを確かめる、中断を `Promise` として待つ、といった処理を、古いランタイムでも同じ書き方で書けます。
+
+<CardGroup cols={3}>
+  <Card title="はじめに" href="/getting-started" icon="rocket">
+    インストールから基本の 3 操作までを数分で試します。
+  </Card>
+  <Card title="API リファレンス" href="/api" icon="book-open">
+    各ユーティリティーの仕様と使い分けを確認します。
+  </Card>
+  <Card title="実践レシピ" href="/guides" icon="cooking-pot">
+    タイムアウトや fetch の中断など、現場の使い方を見ます。
+  </Card>
+</CardGroup>
+
+## できること [#features]
+
+| したいこと | 使う関数 |
+| --- | --- |
+| 複数のシグナルを 1 つにまとめる | `combineSignals` / `combineSignalsFast` |
+| 中断理由を取り出す | `getAbortReason` |
+| 中断済みなら理由を投げる | `throwIfAborted` |
+| 中断を `Promise` として待つ | `toAbortPromise` |
+
+いずれも `AbortSignal` 以外の値を渡しても壊れません。`undefined` や `null` が混ざりうる引数は、そのまま配列や引数に入れてください。選別や分岐は不要です。
+
+## 最小例 [#quick-example]
+
+```ts
+import { combineSignals, throwIfAborted, toAbortPromise } from "abort-signal-utils";
+
+const userController = new AbortController();
+const combined = combineSignals([userController.signal, AbortSignal.timeout(5_000)]);
+
+async function run(signal: AbortSignal): Promise<void> {
+  throwIfAborted(signal); // 中断済みならここで理由を投げます。
+  await Promise.race([
+    fetch("/api/items", { signal }),
+    toAbortPromise(signal), // 中断されると、その理由で拒否されます。
+  ]);
+}
+```
+
+中断理由は文字列や `Error` だけでなく、`null` や `0` などの falsy な値もそのまま引き継ぎます。値の有無ではなく、中断した事実で分岐してください。
+
+## インストール [#install]
+
+```package-install
+npm i abort-signal-utils
+```
+
+```ts
+import {
+  combineSignals,
+  combineSignalsFast,
+  getAbortReason,
+  throwIfAborted,
+  toAbortPromise,
+} from "abort-signal-utils";
+```
+
+ESM 専用で、副作用はありません。バンドラーでも Node.js でも、そのまま読み込めます。
+
+## 対応環境 [#compatibility]
+
+`AbortSignal.any` と `AbortSignal.prototype.throwIfAborted` がある環境ではネイティブ実装に委譲し、ない環境では同等の代替実装で動きます。実行のたびに有無を判定するため、ポリフィルを後から足してもそのまま使えます。

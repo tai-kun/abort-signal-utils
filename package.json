@@ -1,50 +1,18 @@
 {
-  "name": "abort-signal-utils",
+  "name": "abort-signal-utils-monorepo",
   "version": "0.0.0",
-  "description": "",
-  "homepage": "https://github.com/tai-kun/abort-signal-utils",
-  "license": "MIT",
-  "author": "tai-kun",
-  "repository": {
-    "url": "https://github.com/tai-kun/abort-signal-utils"
-  },
-  "files": [
-    "dist",
-    "src",
-    "package.json",
-    "LICENSE",
-    "README.md"
+  "private": true,
+  "workspaces": [
+    "packages/abort-signal-utils",
+    "website"
   ],
   "type": "module",
-  "sideEffects": false,
-  "main": "./dist/src/index.js",
-  "types": "./dist/src/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/src/index.d.ts",
-      "default": "./dist/src/index.js"
-    }
-  },
-  "scripts": {
-    "build": "tsc --project ./.config/tsconfig.build.json"
-  },
-  "dependencies": {
-    "try-capture-stack-trace": "0.0.3"
-  },
   "devDependencies": {
-    "@tsconfig/node24": "24.0.5",
-    "@tsconfig/strictest": "2.0.8",
-    "@types/node": "24.13.3",
-    "@vitest/browser": "4.1.10",
-    "@vitest/browser-playwright": "4.1.10",
-    "npm-check-updates": "22.2.9",
-    "oxfmt": "0.63.0",
-    "oxlint": "1.78.0",
-    "oxlint-tsgolint": "0.25.0",
-    "playwright": "1.62.1",
-    "typescript": "7.0.2",
-    "vite": "8.2.1",
-    "vitest": "4.1.10"
-  },
-  "readme": "README.md"
+    "npm-check-updates": "23.1.0",
+    "oxfmt": "0.71.0",
+    "oxlint": "1.86.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "skills": "1.7.0",
+    "typescript": "7.0.2"
+  }
 }

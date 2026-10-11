@@ -1,0 +1,174 @@
+import { describe, test } from "vitest";
+
+import combineSignalsFast from "../src/combine-signals-fast.js";
+
+describe("有効なシグナルが 1 つ以下", () => {
+  test("空配列では呼び出すたびに未中断の新しいシグナルを返す", ({ expect }) => {
+    // 実行
+    const first = combineSignalsFast([]);
+    const second = combineSignalsFast([]);
+
+    // 検証
+    expect(first).toBeInstanceOf(AbortSignal);
+    expect(first.aborted).toBe(false);
+    expect(second.aborted).toBe(false);
+    expect(first).not.toBe(second);
+  });
+
+  test("有効なシグナルがなければ未中断の新しいシグナルを返す", ({ expect }) => {
+    // 実行
+    const result = combineSignalsFast([
+      null,
+      undefined,
+      0,
+      "",
+      {},
+      [],
+      { aborted: true, reason: "fake" },
+    ]);
+
+    // 検証
+    expect(result).toBeInstanceOf(AbortSignal);
+    expect(result.aborted).toBe(false);
+  });
+
+  test.for([
+    {
+      label: "先頭",
+      make: () => {
+        const controller = new AbortController();
+        return { controller, signals: [controller.signal, null, undefined] as unknown[] };
+      },
+    },
+    {
+      label: "中央",
+      make: () => {
+        const controller = new AbortController();
+        return { controller, signals: [null, controller.signal, 123] as unknown[] };
+      },
+    },
+    {
+      label: "末尾",
+      make: () => {
+        const controller = new AbortController();
+        return { controller, signals: [null, {}, controller.signal] as unknown[] };
+      },
+    },
+  ] as const)("単一の未中断シグナルは同一オブジェクトを返す ($label)", ({ make }, { expect }) => {
+    // 準備
+    const { controller, signals } = make();
+
+    // 実行
+    const result = combineSignalsFast(signals);
+
+    // 検証
+    expect(result).toBe(controller.signal);
+  });
+
+  test("単一の中断済みシグナルは同一オブジェクトを返す", ({ expect }) => {
+    // 準備
+    const signal = AbortSignal.abort("fast-aborted");
+
+    // 実行
+    const result = combineSignalsFast([null, signal]);
+
+    // 検証
+    expect(result).toBe(signal);
+    expect(result.reason).toBe("fast-aborted");
+  });
+
+  test("同一オブジェクトで返したシグナルは元の中断と連動する", ({ expect }) => {
+    // 準備
+    const controller = new AbortController();
+
+    // 実行
+    const result = combineSignalsFast([controller.signal, null]);
+    controller.abort("direct");
+
+    // 検証
+    expect(result).toBe(controller.signal);
+    expect(result.reason).toBe("direct");
+  });
+});
+
+describe("有効なシグナルが 2 つ以上", () => {
+  test("入力とは別の新しい結合シグナルを返す", ({ expect }) => {
+    // 準備
+    const first = new AbortController();
+    const second = new AbortController();
+
+    // 実行
+    const result = combineSignalsFast([first.signal, second.signal]);
+
+    // 検証
+    expect(result).toBeInstanceOf(AbortSignal);
+    expect(result).not.toBe(first.signal);
+    expect(result).not.toBe(second.signal);
+    expect(result.aborted).toBe(false);
+  });
+
+  test.for([
+    {
+      label: "2 個",
+      makeSignals: () => {
+        const first = new AbortController();
+        const second = new AbortController();
+        return { controllers: [first, second], signals: [first.signal, second.signal] };
+      },
+    },
+    {
+      label: "無効な値を挟む",
+      makeSignals: () => {
+        const first = new AbortController();
+        const second = new AbortController();
+        return { controllers: [first, second], signals: [first.signal, null, second.signal] };
+      },
+    },
+    {
+      label: "3 個",
+      makeSignals: () => {
+        const first = new AbortController();
+        const second = new AbortController();
+        const third = new AbortController();
+        return {
+          controllers: [first, second, third],
+          signals: [first.signal, second.signal, third.signal],
+        };
+      },
+    },
+  ] as const)("いずれかの中断で中断する ($label)", ({ makeSignals }, { expect }) => {
+    // 準備
+    const { controllers, signals } = makeSignals();
+    const [first] = controllers;
+    const result = combineSignalsFast(signals);
+
+    // 実行
+    first?.abort("delegated");
+
+    // 検証
+    expect(result.reason).toBe("delegated");
+  });
+
+  test.for([
+    {
+      label: "中断済みを含む",
+      signals: () => [AbortSignal.abort("pre"), new AbortController().signal],
+      expected: "pre",
+    },
+    {
+      label: "2 個とも中断済み",
+      signals: () => [AbortSignal.abort("one"), AbortSignal.abort("two")],
+      expected: "one",
+    },
+  ] as const)(
+    "中断済みがあれば即座に中断済みになる ($label)",
+    ({ signals, expected }, { expect }) => {
+      // 実行
+      const result = combineSignalsFast(signals());
+
+      // 検証
+      expect(result.aborted).toBe(true);
+      expect(result.reason).toBe(expected);
+    },
+  );
+});

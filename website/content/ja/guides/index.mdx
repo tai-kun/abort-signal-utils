@@ -1,0 +1,110 @@
+---
+title: "実践レシピ"
+description: "fetch のタイムアウトや複数の中断元の束ね方など、現場の使い方です。"
+---
+
+定番の組み合わせだけ集めました。いずれもコピーしてそのまま使えます。
+
+## fetch にタイムアウトを付ける [#fetch-timeout]
+
+`AbortSignal.timeout` と `combineSignals` を組むのが最短です。
+
+```ts
+import { combineSignals } from "abort-signal-utils";
+
+const response = await fetch("/api/items", {
+  signal: combineSignals([userSignal, AbortSignal.timeout(5_000)]),
+});
+```
+
+:::tip
+タイムアウト単体なら `AbortSignal.timeout(5_000)` を直接渡せます。`combineSignals` が要るのは、ユーザー操作など 2 つ以上の元を束ねるときだけです。
+:::
+
+## ユーザー操作とタイムアウトを両立する [#combine-sources]
+
+任意の中断元は選別せずに渡せます。`undefined` のまま混ぜても壊れません。
+
+```ts
+import { combineSignals } from "abort-signal-utils";
+
+async function load(userSignal?: AbortSignal): Promise<Response> {
+  const signal = combineSignals([userSignal, AbortSignal.timeout(5_000)]);
+  return fetch("/api/items", { signal });
+}
+```
+
+すでに中断済みが混ざっていれば、返されたシグナルも即座に中断済みになります。呼び出し側で事前検査は不要です。
+
+## ループを中断可能にする [#cancellable-loop]
+
+区切りの処理の先頭で `throwIfAborted` を呼びます。
+
+```ts
+import { throwIfAborted } from "abort-signal-utils";
+
+async function drain(queue: Task[], signal: AbortSignal): Promise<void> {
+  for (const task of queue) {
+    throwIfAborted(signal);
+    await task.run();
+  }
+}
+```
+
+理由で分岐したい場合は `getAbortReason` を使います。理由が `null` や `0` の場合もあるため、有無ではなく `aborted` で判定してください。
+
+```ts
+import { getAbortReason } from "abort-signal-utils";
+
+const reason = getAbortReason(signal);
+if (signal.aborted) {
+  log("中断されました", reason);
+}
+```
+
+## 待機を中断に連動させる [#abortable-wait]
+
+`fetch` が使えない待機は、`Promise.race` と `toAbortPromise` で中断できます。待ちが不要になったら `finally` で `dispose` します。詳しい解除手順は [中断の待機](/api/to-abort-promise#unsubscribe) を参照してください。
+
+```ts
+import { toAbortPromise } from "abort-signal-utils";
+
+const wait = toAbortPromise(signal);
+
+try {
+  await Promise.race([job(), wait]);
+} finally {
+  wait.dispose();
+}
+```
+
+後片付けまで含める場合は、理由を再送出して呼び出し元に伝えます。
+
+```ts
+const wait = toAbortPromise(signal);
+
+try {
+  await Promise.race([job(), wait]);
+} catch (reason) {
+  await release();
+  throw reason;
+} finally {
+  wait.dispose();
+}
+```
+
+## ホットパスで割り当てを削る [#fast-path]
+
+単一シグナルが多い経路では `combineSignalsFast` に置き換えます。有効な入力が 1 つだけなら割り当てなしで返します。
+
+```ts
+import { combineSignalsFast } from "abort-signal-utils";
+
+function bind(signal?: AbortSignal): AbortSignal {
+  return combineSignalsFast([signal, AbortSignal.timeout(5_000)]);
+}
+```
+
+:::warning
+`Fast` が返す単一シグナルは元のオブジェクトと同一です。結果だけを独立に扱いたい経路では `combineSignals` のままにしてください。
+:::

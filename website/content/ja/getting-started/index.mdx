@@ -1,0 +1,74 @@
+---
+title: "はじめに"
+description: "インストールから結合・検査・待機の基本操作までを数分で試します。"
+---
+
+このページでは、インストールから基本の 3 操作までを通しで試します。終わるころには、fetch の中断とタイムアウトを組み合わせられるようになります。
+
+<Steps>
+  <Step title="インストールする">
+    お使いのパッケージマネージャーで追加します。
+
+    ```package-install
+    npm i abort-signal-utils
+    ```
+  </Step>
+  <Step title="シグナルを束ねる">
+    ユーザー操作とタイムアウトなど、複数の中断元を `combineSignals` で 1 つにします。
+
+    ```ts
+    import { combineSignals } from "abort-signal-utils";
+
+    const stop = new AbortController();
+    const combined = combineSignals([stop.signal, AbortSignal.timeout(5_000)]);
+
+    await fetch("/api/items", { signal: combined });
+    ```
+
+    `stop.signal` とタイムアウトのどちらが先に中断しても、`combined` に理由が伝わります。
+  </Step>
+  <Step title="中断を検査する">
+    処理の区切りで `throwIfAborted` を呼び、中断済みなら理由を投げます。
+
+    ```ts
+    import { throwIfAborted } from "abort-signal-utils";
+
+    async function poll(signal: AbortSignal): Promise<void> {
+      for (;;) {
+        throwIfAborted(signal);
+        await work();
+      }
+    }
+    ```
+
+    `AbortSignal` 以外を渡しても何も起きないため、任意引数の検査にも分岐は不要です。
+  </Step>
+  <Step title="中断を待つ">
+    `toAbortPromise` は、中断されると理由で拒否される `Promise` を返します。`Promise.race` と組むと後片付けが短く書けます。
+
+    ```ts
+    import { toAbortPromise } from "abort-signal-utils";
+
+    await Promise.race([run(), toAbortPromise(signal)]);
+    ```
+  </Step>
+</Steps>
+
+## 3 つの約束 [#promises]
+
+このライブラリーの関数は、次の 3 点を共通の前提にしています。覚えておくと分岐が減ります。
+
+- `AbortSignal` 以外は無視します。`null` や `undefined` が混ざっても、そのまま渡してください。
+- 中断理由は値のまま扱います。`null` や `0` でも潰さず、`Error` は同一インスタンスで引き継ぎます。
+- 理由の有無ではなく `aborted` で分岐します。未中断の `getAbortReason` は `undefined` を返します。
+
+## 次のステップ [#next-steps]
+
+<CardGroup cols={2}>
+  <Card title="API 一覧" href="/api" icon="book-open">
+    5 つの関数の仕様と使い分けを確認します。
+  </Card>
+  <Card title="実践レシピ" href="/guides" icon="cooking-pot">
+    タイムアウトや複合中断の実例を見ます。
+  </Card>
+</CardGroup>

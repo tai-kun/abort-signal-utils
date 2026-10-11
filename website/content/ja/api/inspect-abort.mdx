@@ -1,0 +1,92 @@
+---
+title: "中断の検査"
+description: "getAbortReason と throwIfAborted の仕様と使い分けです。"
+---
+
+中断の検査は 2 択です。理由で分岐するなら `getAbortReason`、ガード節で止めるなら `throwIfAborted` を使います。
+
+## 使い分け [#comparison]
+
+```ts
+import { getAbortReason, throwIfAborted } from "abort-signal-utils";
+
+// 理由で分岐する
+const reason = getAbortReason(signal);
+if (reason !== undefined) {
+  cleanup(reason);
+}
+
+// ガード節で止める
+throwIfAborted(signal);
+await next();
+```
+
+:::warning
+中断理由の有無で中断を判定しないでください。理由が `null` や `0` の中断もあります。判定は `signal.aborted` か、この 2 関数の振る舞いで行います。
+:::
+
+## getAbortReason [#get-abort-reason]
+
+```ts
+import { getAbortReason } from "abort-signal-utils";
+
+const reason: unknown = getAbortReason(signal);
+```
+
+<TypeTable
+  type={{
+    signal: {
+      type: "AbortSignal",
+      required: true,
+      description: "理由を取り出すシグナル。",
+    },
+  }}
+/>
+
+仕様は次のとおりです。
+
+- 未中断なら `undefined` を返します。
+- 中断済みなら理由をそのまま返します。`null` や `0` も潰しません。
+- 中断済みなのに理由が `undefined` の稀な状態では、代替の `AbortError`（`DOMException`）を生成して返します。生成した理由にはスタックが付きます。
+
+```ts
+const c = new AbortController();
+console.log(getAbortReason(c.signal)); // undefined
+
+c.abort("stop");
+console.log(getAbortReason(c.signal)); // "stop"
+```
+
+## throwIfAborted [#throw-if-aborted]
+
+```ts
+import { throwIfAborted } from "abort-signal-utils";
+
+throwIfAborted(signal);
+```
+
+<TypeTable
+  type={{
+    signal: {
+      type: "unknown",
+      required: true,
+      description: "調べる値。AbortSignal 以外なら何もしません。",
+    },
+  }}
+/>
+
+仕様は次のとおりです。
+
+- `AbortSignal` 以外では何も投げません。任意引数の検査に分岐は不要です。
+- 未中断では何も投げません。
+- 中断済みなら中断理由を投げます。`Error` は同一インスタンス、`null` や `0` もそのまま投げます。
+- `AbortSignal.prototype.throwIfAborted` がある環境では委譲し、ない環境では理由を直接投げます。呼び出すたびに判定するため、ポリフィルの後付けにも追従します。
+
+```ts
+async function poll(signal: AbortSignal): Promise<void> {
+  for (;;) {
+    throwIfAborted(signal); // 中断済みなら理由を投げて抜けます。
+    await work();
+  }
+}
+```

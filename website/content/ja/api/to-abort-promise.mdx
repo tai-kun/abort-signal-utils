@@ -1,0 +1,139 @@
+---
+title: "中断の待機"
+description: "toAbortPromise で中断を Promise として待つ方法です。"
+---
+
+`toAbortPromise` は、中断されると理由で拒否される `Promise` を返します。`await` や `Promise.race` に中断を組み込めます。
+
+```ts
+import { toAbortPromise } from "abort-signal-utils";
+
+await Promise.race([run(), toAbortPromise(signal)]);
+```
+
+上は使い捨ての最小例です。待ちが不要になっても購読が残るため、実際には[購読の解除](#unsubscribe)の try/finally 形を使ってください。
+
+<TypeTable
+  type={{
+    signal: {
+      type: "unknown",
+      required: true,
+      description: "待ち受ける値。AbortSignal 以外は無視します。",
+    },
+    options: {
+      type: "ToAbortPromiseOptions",
+      description: "待ちの後始末の選択肢。cleanupSignal 以外は無視します。",
+    },
+  }}
+/>
+
+## 振る舞い [#behavior]
+
+| 入力 | 結果 |
+| --- | --- |
+| 未中断のシグナル | 中断まで未確定のまま残り、中断時に理由で拒否されます。 |
+| 中断済みのシグナル | cleanupSignal の有無にかかわらず即座に理由で拒否されます。 |
+| `AbortSignal` 以外 | cleanupSignal に触れず未確定のまま残ります。 |
+| 中断済みの cleanupSignal | どちらの購読も作らず未確定のまま残ります。 |
+| cleanupSignal の中断 | 待ちを止めて未確定のまま残ります。以後 signal が中断しても拒否されません。 |
+| cleanupSignal 以外 | signal のみを購読し、中断時に理由で拒否されます。 |
+| signal と cleanupSignal が同一 | 中断時は理由で拒否されます。dispose 先行なら未確定のまま残ります。 |
+
+中断理由は値のまま拒否されます。`Error` は同一インスタンス、`null` や `0` もそのまま届きます。理由なしの中断では既定の `AbortError` が届きます。
+
+成功では解決しません。戻り値は `PromiseLike<never>` であり、`then` の成功側は来ません。`await` か `Promise.resolve()` で使ってください。
+
+```ts
+const controller = new AbortController();
+const wait = toAbortPromise(controller.signal);
+
+controller.abort("stop");
+await expect(Promise.resolve(wait)).rejects.toBe("stop");
+```
+
+:::warning
+`AbortSignal` 以外を渡すと永遠に待ち続けます。`Promise.race` の相手がそれだけだと処理が止まるため、必ず実行される側の `Promise` と組にしてください。
+:::
+
+中断後は signal と cleanupSignal のどちらの購読も残りません。
+
+## 購読の解除 [#unsubscribe]
+
+待ちが不要になったら `dispose` で購読を解除します。`Promise.race` で相手側が先に終わる場合は、`finally` で必ず後始末してください。
+
+```ts
+import { toAbortPromise } from "abort-signal-utils";
+
+const wait = toAbortPromise(signal);
+
+try {
+  await Promise.race([job(), wait]);
+} finally {
+  wait.dispose();
+}
+```
+
+別のシグナルで待ちを止めたい場合は、`cleanupSignal` を渡します。中断されると待ちを止めて未確定のまま残します。
+
+```ts
+const wait = toAbortPromise(signal, { cleanupSignal: stopSignal });
+
+try {
+  await Promise.race([job(), wait]);
+} finally {
+  wait.dispose();
+}
+```
+
+`using` を使うと、`finally` を書かずに同じ後始末ができます。
+
+```ts
+{
+  using wait = toAbortPromise(signal);
+  await Promise.race([job(), wait]);
+}
+```
+
+:::tip
+`dispose` はすべての環境で使えます。`using` は `Symbol.dispose` がある環境でのみ使えます。
+:::
+
+`then` や `Promise.resolve()` で得た派生には `dispose` は付きません。後始末は元の `wait` に対して呼んでください。
+
+:::warning
+`cleanupSignal` の中断は拒否ではなく未確定のまま残します。打ち切りを失敗として扱いたい場合は、`signal` 側に束ねてから待ってください。
+:::
+
+## よくある使い方 [#recipes]
+
+### 処理と中断を競争させる [#race]
+
+```ts
+await Promise.race([
+  fetch("/api/items", { signal }),
+  toAbortPromise(signal),
+]);
+```
+
+fetch 自体が `signal` を受けられる場合、この二重化は不要です。fetch できない後処理や待機と組むときに使ってください。
+
+### 後片付けを中断に連動させる [#cleanup]
+
+```ts
+const wait = toAbortPromise(signal);
+
+try {
+  await Promise.race([job(), wait]);
+} catch (reason) {
+  await release();
+  throw reason;
+} finally {
+  wait.dispose();
+}
+```
+
+中断理由は値のまま拒否されます。`Error` は同一インスタンス、`null` や `0` もそのまま届きます。理由なしの中断では既定の `AbortError` が届きます。
+
+## 実装の注意 [#notes]
+
+中断の購読は発火後に残りません。中断済みの入力は購読せずに即時拒否します。返されるのは軽量な `PromiseLike` であり、ネイティブの `Promise` が要る場面では `Promise.resolve()` で包んでください。

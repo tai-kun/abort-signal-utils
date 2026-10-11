@@ -1,0 +1,93 @@
+---
+title: "シグナルの結合"
+description: "combineSignals と combineSignalsFast の仕様と使い分けです。"
+---
+
+複数の `AbortSignal` を 1 つに束ねます。`AbortSignal` 以外は無視するため、任意の中断元は選別せずに渡せます。
+
+## 使い分け [#comparison]
+
+| 関数 | 返すもの | 向き |
+| --- | --- | --- |
+| `combineSignals` | 常に新しいシグナル | 既定はこちら |
+| `combineSignalsFast` | 単一なら入力をそのまま返す | 単一が多いホットパス |
+
+独立したオブジェクトが必要なら `combineSignals` を使ってください。`Fast` が返す単一シグナルは元のオブジェクトと同一であり、区別できません。
+
+```ts
+import { combineSignals, combineSignalsFast } from "abort-signal-utils";
+
+// 既定
+const s1 = combineSignals([a, b]); // 常に新規
+// 最適化したいときだけ
+const s2 = combineSignalsFast([a]); // a と同一
+```
+
+## combineSignals [#combine-signals]
+
+```ts
+import combineSignals from "abort-signal-utils";
+
+const combined: AbortSignal = combineSignals(signals);
+```
+
+<TypeTable
+  type={{
+    signals: {
+      type: "readonly unknown[]",
+      required: true,
+      description: "束ねる値の配列。AbortSignal 以外は無視します。",
+    },
+  }}
+/>
+
+仕様は次のとおりです。
+
+- いずれかが中断すると、最初に中断した理由で中断します。
+- 中断済みが含まれていれば、即座にその理由で中断します。複数ある場合は、先頭側の中断済みを優先します。
+- 有効なシグナルがなくても、未中断の新しいシグナルを返します。
+- 呼び出すたびに独立した新しいシグナルを返し、入力配列は変更しません。
+- `AbortSignal.any` がある環境では委譲し、ない環境では同等の代替実装で束ねます。
+
+```ts
+const stop = new AbortController();
+const combined = combineSignals([stop.signal, AbortSignal.timeout(5_000), undefined]);
+
+stop.abort("user-stop"); // combined.reason は "user-stop" になります。
+```
+
+## combineSignalsFast [#combine-signals-fast]
+
+```ts
+import { combineSignalsFast } from "abort-signal-utils";
+
+const combined: AbortSignal = combineSignalsFast(signals);
+```
+
+仕様は次のとおりです。
+
+- 有効なシグナルが 1 つだけなら、新しい割り当てなしでそれ自体を返します。
+- 有効なシグナルがなければ、未中断の新しいシグナルを返します。
+- 有効なシグナルが 2 つ以上あれば、`combineSignals` に委譲します。
+
+```ts
+const single = combineSignalsFast([controller.signal, undefined]);
+console.log(single === controller.signal); // true
+```
+
+:::warning
+返された単一シグナルは元のオブジェクトと同一です。後から「結合結果だけ中断したい」といった区別はできません。独立性が要る場合は `combineSignals` を使ってください。
+:::
+
+## 理由の引き継ぎ [#reason]
+
+中断理由は値のまま伝わります。`Error` は同一インスタンスを保ち、`null` や `0` などの falsy な値も潰しません。理由なしの中断では、実行環境の既定の `AbortError` が伝わります。
+
+```ts
+const err = new Error("boom");
+const c = new AbortController();
+c.abort(err);
+
+const combined = combineSignals([c.signal]);
+console.log(combined.reason === err); // true
+```
