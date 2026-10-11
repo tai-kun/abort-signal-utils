@@ -28,7 +28,7 @@ const s2 = combineSignalsFast([a]); // a と同一
 ```ts
 import combineSignals from "abort-signal-utils";
 
-const combined: AbortSignal = combineSignals(signals);
+const combined: AbortSignal = combineSignals(signals, options);
 ```
 
 <TypeTable
@@ -38,16 +38,23 @@ const combined: AbortSignal = combineSignals(signals);
       required: true,
       description: "束ねる値の配列。AbortSignal 以外は無視します。",
     },
+    options: {
+      type: "CombineSignalsOptions",
+      description: "結合の後始末の選択肢。cleanupSignal 以外は無視します。",
+    },
   }}
 />
 
 仕様は次のとおりです。
 
-- いずれかが中断すると、最初に中断した理由で中断します。
-- 中断済みが含まれていれば、即座にその理由で中断します。複数ある場合は、先頭側の中断済みを優先します。
-- 有効なシグナルがなくても、未中断の新しいシグナルを返します。
+- 入力のいずれかが中断すると、最初に中断した理由で中断します。
+- 中断済みが含まれていれば、即座にその理由で中断します。複数ある場合は、先頭側の中断済みを優先します。このとき `cleanupSignal` には触れません。
+- 有効なシグナルがなくても、未中断の新しいシグナルを返します。このとき `cleanupSignal` には触れません。
 - 呼び出すたびに独立した新しいシグナルを返し、入力配列は変更しません。
-- `AbortSignal.any` がある環境では委譲し、ない環境では同等の代替実装で束ねます。
+- `AbortSignal.any` がある環境では委譲し、ない環境では同等の代替実装で束ねます。ただし、未中断の `cleanupSignal` がある場合は、環境にかかわらず代替実装で束ねます。未中断の `cleanupSignal` を指定したときは、どの環境でも同じ解除挙動になります。
+- 結果が未中断である間は、入力への購読が残ります。入力の中断により結果が中断すると、入力と `cleanupSignal` の購読を解除します。
+- `cleanupSignal` の中断では結果は中断せず、未中断のまま残ります (`aborted` は `false`、`reason` は `undefined` のままです)。入力の購読を止めるため、以後の入力の中断は伝わりません。
+- `cleanupSignal` が未指定・中断済みの場合は、従来どおり入力のみを束ねます。中断済みの `cleanupSignal` を渡しても、入力への購読は通常どおり残ります。入力と `cleanupSignal` に同一のオブジェクトを渡した場合、中断時は入力として扱います。
 
 ```ts
 const stop = new AbortController();
@@ -56,19 +63,39 @@ const combined = combineSignals([stop.signal, AbortSignal.timeout(5_000), undefi
 stop.abort("user-stop"); // combined.reason は "user-stop" になります。
 ```
 
+:::warning
+代替実装で束ねた結果が未中断である間は、入力への購読が残ります。入力の中断か `cleanupSignal` の中断で残りません。`AbortSignal.any` に委譲した場合は、この購読は発生しません。結合が不要になったら、`cleanupSignal` の中断で購読を解除してください。
+:::
+
+結合の後始末を別のシグナルに連動させる場合は、`cleanupSignal` を渡します。結合が不要になった合図で中断してください。
+
+```ts
+import { combineSignals } from "abort-signal-utils";
+
+const cleanup = new AbortController();
+const combined = combineSignals([userSignal, AbortSignal.timeout(5_000)], {
+  cleanupSignal: cleanup.signal,
+});
+
+// 結合が不要になったら、中断して購読を解除します。
+// combined は未中断のまま残り、以後の入力の中断は伝わりません。
+cleanup.abort();
+```
+
 ## combineSignalsFast [#combine-signals-fast]
 
 ```ts
 import { combineSignalsFast } from "abort-signal-utils";
 
-const combined: AbortSignal = combineSignalsFast(signals);
+const combined: AbortSignal = combineSignalsFast(signals, options);
 ```
 
-仕様は次のとおりです。
+選択肢の意味は `combineSignals` と同じです。仕様は次のとおりです。
 
-- 有効なシグナルが 1 つだけなら、新しい割り当てなしでそれ自体を返します。
-- 有効なシグナルがなければ、未中断の新しいシグナルを返します。
-- 有効なシグナルが 2 つ以上あれば、`combineSignals` に委譲します。
+- 有効なシグナルが 1 つだけの場合でも、未中断の `cleanupSignal` があるときは、`combineSignals` に委譲して新しいシグナルを返します。`cleanupSignal` の中断で購読を解除できます。
+- 有効なシグナルが 1 つだけで、`cleanupSignal` が未指定・中断済みのときは、新しい割り当てなしでそれ自体を返します。中断済みの入力は `cleanupSignal` に触れずそのまま返します。
+- 有効なシグナルがなければ、未中断の新しいシグナルを返します。このとき `cleanupSignal` には触れません。
+- 有効なシグナルが 2 つ以上あれば、`options` を含めて `combineSignals` に委譲します。
 
 ```ts
 const single = combineSignalsFast([controller.signal, undefined]);

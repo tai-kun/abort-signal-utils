@@ -9,8 +9,8 @@ description: "6 つの関数の仕様と使い分けを 1 ページで見渡し�
 
 | 関数 | シグネチャー | 用途 |
 | --- | --- | --- |
-| `combineSignals` | `(signals: readonly unknown[]) => AbortSignal` | 複数を束ねて、新しいシグナルを作ります。 |
-| `combineSignalsFast` | `(signals: readonly unknown[]) => AbortSignal` | 単一なら割り当てなしで返します。 |
+| `combineSignals` | `(signals: readonly unknown[], options?: CombineSignalsOptions) => AbortSignal` | 複数を束ねて、新しいシグナルを作ります。 |
+| `combineSignalsFast` | `(signals: readonly unknown[], options?: CombineSignalsOptions) => AbortSignal` | 単一なら割り当てなしで返します。 |
 | `getAbortReason` | `(signal: AbortSignal) => unknown` | 理由を取り出します。投げません。 |
 | `throwIfAborted` | `(signal: unknown) => void` | 中断済みなら理由を投げます。 |
 | `toAbortPromise` | `(signal: unknown, options?: ToAbortPromiseOptions) => AbortPromiseLike` | 中断を待てる `Promise` にします。 |

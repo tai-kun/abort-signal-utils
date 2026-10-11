@@ -89,6 +89,112 @@ describe("有効なシグナルが 1 つ以下", () => {
     expect(result).toBe(controller.signal);
     expect(result.reason).toBe("direct");
   });
+
+  test("単一の未中断と有効なcleanupでは新規オブジェクトを返す", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+
+    // 実行
+    const result = combineSignalsFast([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 検証
+    expect(result).not.toBe(input.signal);
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+  });
+
+  test("単一の未中断と有効なcleanupではcleanupで追従を止められる", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignalsFast([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 実行
+    cleanup.abort("cleanup");
+    input.abort("late");
+
+    // 検証
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+  });
+
+  test("単一の未中断と有効なcleanupでは入力の中断が伝わる", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignalsFast([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 実行
+    input.abort("real");
+
+    // 検証
+    expect(result.reason).toBe("real");
+  });
+
+  test("中断済みのcleanupでは単一の未中断をそのまま返す", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    cleanup.abort("cleanup");
+
+    // 実行
+    const result = combineSignalsFast([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 検証
+    expect(result).toBe(input.signal);
+  });
+
+  test.for([
+    { label: "有効なcleanup", makeCleanup: () => new AbortController().signal },
+    {
+      label: "中断済みcleanup",
+      makeCleanup: () => {
+        const cleanup = new AbortController();
+        cleanup.abort("cleanup");
+        return cleanup.signal;
+      },
+    },
+  ] as const)(
+    "中断済みの単一入力はcleanupがあっても同一オブジェクトを返す ($label)",
+    ({ makeCleanup }, { expect }) => {
+      // 準備
+      const signal = AbortSignal.abort("already");
+      const cleanup = makeCleanup();
+
+      // 実行
+      const result = combineSignalsFast([signal], { cleanupSignal: cleanup });
+
+      // 検証
+      expect(result).toBe(signal);
+      expect(result.reason).toBe("already");
+    },
+  );
+
+  test("cleanupSignal が undefined では単一の未中断をそのまま返す", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+
+    // 実行
+    const result = combineSignalsFast([input.signal], { cleanupSignal: undefined });
+
+    // 検証
+    expect(result).toBe(input.signal);
+  });
+
+  test("空配列では有効なcleanupがあっても未中断の新規シグナルを返す", ({ expect }) => {
+    // 準備
+    const cleanup = new AbortController();
+
+    // 実行
+    const result = combineSignalsFast([], { cleanupSignal: cleanup.signal });
+
+    // 検証
+    expect(result).toBeInstanceOf(AbortSignal);
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+    expect(result).not.toBe(cleanup.signal);
+  });
 });
 
 describe("有効なシグナルが 2 つ以上", () => {
@@ -171,4 +277,42 @@ describe("有効なシグナルが 2 つ以上", () => {
       expect(result.reason).toBe(expected);
     },
   );
+
+  test("2件以上と有効なcleanupではcleanupで追従を止められる", ({ expect }) => {
+    // 準備
+    const first = new AbortController();
+    const second = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignalsFast([first.signal, second.signal], {
+      cleanupSignal: cleanup.signal,
+    });
+
+    // 実行
+    cleanup.abort("cleanup");
+    first.abort("late");
+    second.abort("late");
+
+    // 検証
+    expect(result).not.toBe(first.signal);
+    expect(result).not.toBe(second.signal);
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+  });
+
+  test("2件以上と有効なcleanupでは入力の中断が伝わる", ({ expect }) => {
+    // 準備
+    const first = new AbortController();
+    const second = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignalsFast([first.signal, second.signal], {
+      cleanupSignal: cleanup.signal,
+    });
+
+    // 実行
+    second.abort("real");
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("real");
+  });
 });

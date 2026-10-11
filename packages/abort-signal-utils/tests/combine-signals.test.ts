@@ -155,6 +155,175 @@ describe("AbortSignal.any がある環境", () => {
     expect(input[0]).toBe(controller.signal);
     expect(input[1]).toBe(null);
   });
+
+  test("cleanupの中断で入力への追従を止める", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignals([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 実行
+    cleanup.abort("cleanup");
+    input.abort("late");
+
+    // 検証
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+  });
+
+  test("入力の中断でcleanupの購読を解除する", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignals([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 実行
+    input.abort("input");
+    cleanup.abort("cleanup");
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("input");
+  });
+
+  test("中断済みのcleanupでも入力への追従は残る", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    cleanup.abort("cleanup");
+
+    // 実行
+    const result = combineSignals([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 検証
+    expect(result.aborted).toBe(false);
+    input.abort("real");
+    expect(result.reason).toBe("real");
+  });
+
+  test("中断済み入力は中断済みcleanupより優先される", ({ expect }) => {
+    // 準備
+    const cleanup = new AbortController();
+    cleanup.abort("cleanup");
+
+    // 実行
+    const result = combineSignals([AbortSignal.abort("input")], {
+      cleanupSignal: cleanup.signal,
+    });
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("input");
+  });
+
+  test("cleanupSignal が undefined では入力の中断が伝わる", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+
+    // 実行
+    const result = combineSignals([input.signal], { cleanupSignal: undefined });
+    input.abort("real");
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("real");
+  });
+
+  test("余剰プロパティは無視される", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const options = {
+      cleanupSignal: cleanup.signal,
+      unknownProp: "ignored",
+    } as unknown as Parameters<typeof combineSignals>[1];
+
+    // 実行
+    const result = combineSignals([input.signal], options);
+    cleanup.abort("cleanup");
+    input.abort("late");
+
+    // 検証
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+  });
+
+  test("同一オブジェクトが中断済みなら即座に中断する", ({ expect }) => {
+    // 準備
+    const controller = new AbortController();
+    controller.abort("same");
+
+    // 実行
+    const result = combineSignals([controller.signal], {
+      cleanupSignal: controller.signal,
+    });
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("same");
+  });
+
+  test("同一オブジェクトの未中断では中断が伝わる", ({ expect }) => {
+    // 準備
+    const controller = new AbortController();
+    const result = combineSignals([controller.signal], {
+      cleanupSignal: controller.signal,
+    });
+
+    // 実行
+    controller.abort("lazy");
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("lazy");
+  });
+
+  test("重複入力でもcleanupで追従を止められる", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignals([input.signal, input.signal], {
+      cleanupSignal: cleanup.signal,
+    });
+
+    // 実行
+    cleanup.abort("cleanup");
+    input.abort("late");
+
+    // 検証
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+  });
+
+  test("重複入力でも入力の中断が伝わる", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignals([input.signal, input.signal], {
+      cleanupSignal: cleanup.signal,
+    });
+
+    // 実行
+    input.abort("real");
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("real");
+  });
+
+  test("空配列でも有効なcleanupがあれば未中断の新規シグナルを返す", ({ expect }) => {
+    // 準備
+    const cleanup = new AbortController();
+
+    // 実行
+    const result = combineSignals([], { cleanupSignal: cleanup.signal });
+
+    // 検証
+    expect(result).toBeInstanceOf(AbortSignal);
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+    expect(result).not.toBe(cleanup.signal);
+  });
 });
 
 describe("AbortSignal.any がない環境", () => {
@@ -258,5 +427,185 @@ describe("AbortSignal.any がない環境", () => {
     // 検証
     expect(first).not.toBe(second);
     expect(first).not.toBe(controller.signal);
+  });
+
+  test("cleanupの中断で入力への追従を止める", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignals([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 実行
+    cleanup.abort("cleanup");
+    input.abort("late");
+
+    // 検証
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+  });
+
+  test("入力の中断でcleanupの購読を解除する", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignals([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 実行
+    input.abort("input");
+    cleanup.abort("cleanup");
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("input");
+  });
+
+  test("中断済みのcleanupでも入力への追従は残る", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    cleanup.abort("cleanup");
+
+    // 実行
+    const result = combineSignals([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 検証
+    expect(result.aborted).toBe(false);
+    input.abort("real");
+    expect(result.reason).toBe("real");
+  });
+
+  test("中断済み入力は中断済みcleanupより優先される", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const cleanup = new AbortController();
+    cleanup.abort("cleanup");
+
+    // 実行
+    const result = combineSignals([AbortSignal.abort("input")], {
+      cleanupSignal: cleanup.signal,
+    });
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("input");
+  });
+
+  test("cleanupSignal が undefined では入力の中断が伝わる", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const input = new AbortController();
+
+    // 実行
+    const result = combineSignals([input.signal], { cleanupSignal: undefined });
+    input.abort("real");
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("real");
+  });
+
+  test("余剰プロパティは無視される", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const options = {
+      cleanupSignal: cleanup.signal,
+      unknownProp: "ignored",
+    } as unknown as Parameters<typeof combineSignals>[1];
+
+    // 実行
+    const result = combineSignals([input.signal], options);
+    cleanup.abort("cleanup");
+    input.abort("late");
+
+    // 検証
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+  });
+
+  test("同一オブジェクトが中断済みなら即座に中断する", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const controller = new AbortController();
+    controller.abort("same");
+
+    // 実行
+    const result = combineSignals([controller.signal], {
+      cleanupSignal: controller.signal,
+    });
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("same");
+  });
+
+  test("同一オブジェクトの未中断では中断が伝わる", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const controller = new AbortController();
+    const result = combineSignals([controller.signal], {
+      cleanupSignal: controller.signal,
+    });
+
+    // 実行
+    controller.abort("lazy");
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("lazy");
+  });
+
+  test("重複入力でもcleanupで追従を止められる", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignals([input.signal, input.signal], {
+      cleanupSignal: cleanup.signal,
+    });
+
+    // 実行
+    cleanup.abort("cleanup");
+    input.abort("late");
+
+    // 検証
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+  });
+
+  test("重複入力でも入力の中断が伝わる", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    const result = combineSignals([input.signal, input.signal], {
+      cleanupSignal: cleanup.signal,
+    });
+
+    // 実行
+    input.abort("real");
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("real");
+  });
+
+  test("空配列でも有効なcleanupがあれば未中断の新規シグナルを返す", ({ expect }) => {
+    // 準備
+    using _hide = withoutAbortSignalAny();
+    const cleanup = new AbortController();
+
+    // 実行
+    const result = combineSignals([], { cleanupSignal: cleanup.signal });
+
+    // 検証
+    expect(result).toBeInstanceOf(AbortSignal);
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+    expect(result).not.toBe(cleanup.signal);
   });
 });
