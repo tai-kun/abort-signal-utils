@@ -1,0 +1,88 @@
+---
+title: "API Overview"
+description: "The spec and usage of all 7 functions on one page."
+---
+
+The 7 functions do not overlap. Pick one for what you want to do. The shared premises (handling of non-signals and reason preservation) are summarized at the end of this page.
+
+## Overview [#overview]
+
+| Function | Signature | Purpose |
+| --- | --- | --- |
+| `combineSignals` | `(signals: readonly unknown[], options?: CombineSignalsOptions) => AbortSignal` | Combine several into a new signal. |
+| `combineSignalsFast` | `(signals: readonly unknown[], options?: CombineSignalsOptions) => AbortSignal` | Return a single input as-is with no allocation. |
+| `timeoutSignal` | `(ms: number, options?: TimeoutSignalOptions) => AbortSignal` | Create a signal that aborts after a delay. |
+| `getAbortReason` | `(signal: AbortSignal) => unknown` | Read the reason. Never throws. |
+| `throwIfAborted` | `(signal: unknown) => void` | Throw the reason if already aborted. |
+| `toAbortPromise` | `(signal: unknown, options?: ToAbortPromiseOptions) => AbortPromiseLike` | Turn abortion into an awaitable `Promise`. |
+| `withSignal` | `(signal: AbortSignal, task: () => T) => Promise<Awaited<T>>` | Race a task against abortion. |
+
+## Which to use [#which-to-use]
+
+### Combining: two choices [#combine]
+
+| Situation | Function |
+| --- | --- |
+| Default choice | `combineSignals` |
+| Hot path with many single signals, want fewer allocations | `combineSignalsFast` |
+
+`Fast` returns the input itself when there is only one valid signal, so the result is indistinguishable from the original. Use `combineSignals` when you need an independent object. See [Combining signals](/api/combine-signals) for details.
+
+### Inspecting: two choices [#inspect]
+
+| Situation | Function |
+| --- | --- |
+| Branch on the reason | `getAbortReason` |
+| Bail out in a guard clause | `throwIfAborted` |
+
+```ts
+import { getAbortReason, throwIfAborted } from "abort-signal-utils";
+
+// When you want to branch
+const reason = getAbortReason(signal);
+if (reason !== undefined) {
+  cleanup(reason);
+}
+
+// When you want to bail out first
+throwIfAborted(signal);
+await next();
+```
+
+See [Inspecting abortion](/api/inspect-abort) for details.
+
+### Waiting and running [#wait]
+
+To plug abortion into `await` or `Promise.race`, use `toAbortPromise`. It never resolves on success and rejects with the reason on abort. Call `dispose` to unsubscribe when the wait is no longer needed. Unsubscribing is covered in [Unsubscribing](/api/to-abort-promise#unsubscribe). See [Waiting for abortion](/api/to-abort-promise) for details.
+
+To race the execution itself, use `withSignal`. If already aborted it never calls `task`; otherwise it calls `task` exactly once and races it against abortion. No cleanup needed. See [Running with a signal](/api/with-signal) for details.
+
+To get a signal that aborts after a delay, use `timeoutSignal`. See [Timeout](/api/timeout-signal) for details.
+
+## Shared rules [#shared-rules]
+
+Read this before the individual pages.
+
+- Except for `withSignal`, `combineSignals` variants, `throwIfAborted`, `toAbortPromise`, and the `cleanupSignal` of `timeoutSignal` ignore non-`AbortSignal` values. Optional signal arguments can be passed without filtering. The `ms` of `timeoutSignal` is the exception: invalid values throw immediately.
+- Pass an `AbortSignal` as the `signal` of `withSignal`. If already aborted, it rejects with the reason without calling the function.
+- Abort reasons are passed through as-is. Falsy values such as `null` and `0` are preserved, and `Error` keeps its identity.
+- Abortion without a reason uses the runtime's default `AbortError` (`DOMException`). In the rare state where a signal is aborted with its reason still `undefined`, a replacement `AbortError` is created. The default for `timeoutSignal` is `TimeoutError` (`DOMException`).
+- `combineSignals` returns an independent new signal on every call and never mutates the input array.
+
+<CardGroup cols={3}>
+  <Card title="Combining signals" href="/api/combine-signals" icon="merge">
+    Read the spec of combineSignals and Fast.
+  </Card>
+  <Card title="Timeout" href="/api/timeout-signal" icon="timer">
+    Read the spec of timeoutSignal.
+  </Card>
+  <Card title="Inspecting abortion" href="/api/inspect-abort" icon="search-check">
+    Read getAbortReason and throwIfAborted.
+  </Card>
+  <Card title="Waiting for abortion" href="/api/to-abort-promise" icon="hourglass">
+    Read the spec of toAbortPromise.
+  </Card>
+  <Card title="Running with a signal" href="/api/with-signal" icon="play">
+    Read the spec of withSignal.
+  </Card>
+</CardGroup>

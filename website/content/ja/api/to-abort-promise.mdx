@@ -11,7 +11,7 @@ import { toAbortPromise } from "abort-signal-utils";
 await Promise.race([run(), toAbortPromise(signal)]);
 ```
 
-上は使い捨ての最小例です。待ちが不要になっても購読が残るため、実際には[購読の解除](#unsubscribe)の try/finally 形を使ってください。
+上の例は使い捨ての最小例です。待ちが不要になっても購読が残るため、実際には[購読の解除](#unsubscribe)の try/finally 形式を使ってください。
 
 <TypeTable
   type={{
@@ -41,7 +41,7 @@ await Promise.race([run(), toAbortPromise(signal)]);
 
 中断理由は値のまま拒否されます。`Error` は同一インスタンス、`null` や `0` もそのまま届きます。理由なしの中断では既定の `AbortError` が届きます。
 
-成功では解決しません。戻り値は `PromiseLike<never>` であり、`then` の成功側は来ません。`await` か `Promise.resolve()` で使ってください。
+成功では解決しません。戻り値は `PromiseLike<never>` であり、`then` の成功側のコールバックは呼ばれません。`await` か `Promise.resolve()` で使ってください。
 
 ```ts
 const controller = new AbortController();
@@ -52,7 +52,7 @@ await expect(Promise.resolve(wait)).rejects.toBe("stop");
 ```
 
 :::warning
-`AbortSignal` 以外を渡すと永遠に待ち続けます。`Promise.race` の相手がそれだけだと処理が止まるため、必ず実行される側の `Promise` と組にしてください。
+`AbortSignal` 以外を渡すと永遠に待ち続けます。`Promise.race` の相手がその待ちだけだと処理が止まるため、必ず実行される側の `Promise` と組にしてください。
 :::
 
 中断後は signal と cleanupSignal のどちらの購読も残りません。
@@ -73,7 +73,7 @@ try {
 }
 ```
 
-別のシグナルで待ちを止めたい場合は、`cleanupSignal` を渡します。中断されると待ちを止めて未確定のまま残します。
+別のシグナルで待ちを止めたい場合は、`cleanupSignal` を渡します。`cleanupSignal` が中断されると待ちを止めて未確定のまま残します。
 
 ```ts
 const wait = toAbortPromise(signal, { cleanupSignal: stopSignal });
@@ -98,10 +98,10 @@ try {
 `dispose` はすべての環境で使えます。`using` は `Symbol.dispose` がある環境でのみ使えます。
 :::
 
-`then` や `Promise.resolve()` で得た派生には `dispose` は付きません。後始末は元の `wait` に対して呼んでください。
+`then` や `Promise.resolve()` で得た派生 Promise には `dispose` は付きません。後始末は元の `wait` に対して呼んでください。
 
 :::warning
-`cleanupSignal` の中断は拒否ではなく未確定のまま残します。打ち切りを失敗として扱いたい場合は、`signal` 側に束ねてから待ってください。
+`cleanupSignal` の中断は拒否ではなく未確定のまま残します。中断を失敗として扱いたい場合は、`signal` 側に束ねてから待ってください。
 :::
 
 ## よくある使い方 [#recipes]
@@ -115,7 +115,7 @@ await Promise.race([
 ]);
 ```
 
-fetch 自体が `signal` を受けられる場合、この二重化は不要です。fetch できない後処理や待機と組むときに使ってください。
+fetch 自体が `signal` を受けられる場合、この待ちとの併用は不要です。fetch できない後処理や待機と組むときに使ってください。
 
 ### 後片付けを中断に連動させる [#cleanup]
 
@@ -138,4 +138,4 @@ try {
 
 ## 実装の注意 [#notes]
 
-中断の購読は発火後に残りません。中断済みの入力は購読せずに即時拒否します。返されるのは軽量な `PromiseLike` であり、ネイティブの `Promise` が要る場面では `Promise.resolve()` で包んでください。
+中断の購読は発火後に残りません。中断済みの入力は購読せずに即時拒否します。返されるのは軽量な `PromiseLike` であり、ネイティブの `Promise` が必要な場面では `Promise.resolve()` で包んでください。

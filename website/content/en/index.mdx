@@ -1,0 +1,84 @@
+---
+title: "Abort Signal Utils"
+description: "Small utilities for AbortSignal."
+---
+
+Small ESM library extracted from common `AbortSignal` boilerplate. Combine multiple signals into one, inspect whether a signal is aborted, or await abortion as a `Promise` — with the same API on older runtimes.
+
+<CardGroup cols={3}>
+  <Card title="Getting Started" href="/getting-started" icon="rocket">
+    Install and try the three basic operations in a few minutes.
+  </Card>
+  <Card title="API Reference" href="/api" icon="book-open">
+    Check the spec and usage of each utility.
+  </Card>
+  <Card title="Recipes" href="/guides" icon="cooking-pot">
+    See real-world uses such as timeouts and fetch abortion.
+  </Card>
+</CardGroup>
+
+## What you can do [#features]
+
+| Goal | Function |
+| --- | --- |
+| Combine multiple signals into one | `combineSignals` / `combineSignalsFast` |
+| Read the abort reason | `getAbortReason` |
+| Throw the reason if already aborted | `throwIfAborted` |
+| Create a signal that aborts after a timeout | `timeoutSignal` |
+| Await abortion as a `Promise` | `toAbortPromise` |
+| Race a task against abortion | `withSignal` |
+
+Except for `withSignal`, none of these throw when given non-`AbortSignal` values. Pass `undefined` or `null` straight into arrays or arguments — no filtering or branching needed. Pass an `AbortSignal` as the `signal` of `withSignal`.
+
+## Minimal example [#quick-example]
+
+```ts
+import { combineSignals, throwIfAborted, timeoutSignal, toAbortPromise, withSignal } from "abort-signal-utils";
+
+const userController = new AbortController();
+const combined = combineSignals([userController.signal, timeoutSignal(5_000)]);
+
+async function run(signal: AbortSignal): Promise<void> {
+  throwIfAborted(signal); // Throws the reason here if already aborted.
+  await Promise.race([
+    fetch("/api/items", { signal }),
+    toAbortPromise(signal), // Rejects with the reason when aborted.
+  ]);
+}
+```
+
+Abort reasons are passed through as-is — not only strings and `Error`s, but also falsy values such as `null` and `0`. Branch on the fact of abortion, not on the presence of a value.
+
+To race the execution itself, use `withSignal`.
+
+```ts
+import { withSignal } from "abort-signal-utils";
+
+await withSignal(signal, () => job());
+```
+
+## Install [#install]
+
+```package-install
+npm i abort-signal-utils
+```
+
+```ts
+import {
+  combineSignals,
+  combineSignalsFast,
+  getAbortReason,
+  throwIfAborted,
+  timeoutSignal,
+  toAbortPromise,
+  withSignal,
+} from "abort-signal-utils";
+```
+
+ESM-only with no side effects. Works as-is in bundlers and Node.js.
+
+## Compatibility [#compatibility]
+
+Delegates to the native implementation where `AbortSignal.any` and `AbortSignal.prototype.throwIfAborted` exist, and uses an equivalent fallback elsewhere. Support is checked on every call, so a polyfill added later is picked up automatically.
+
+`timeoutSignal` delegates to `AbortSignal.timeout` when available and the conditions match, and otherwise uses a fallback.

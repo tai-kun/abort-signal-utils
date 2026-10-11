@@ -1,0 +1,141 @@
+---
+title: "Waiting for abortion"
+description: "How to await abortion as a Promise with toAbortPromise."
+---
+
+`toAbortPromise` returns a `Promise` that rejects with the reason on abort. It plugs abortion into `await` and `Promise.race`.
+
+```ts
+import { toAbortPromise } from "abort-signal-utils";
+
+await Promise.race([run(), toAbortPromise(signal)]);
+```
+
+This minimal example is single-use. The subscription remains after the wait is no longer needed, so use the try/finally form from [Unsubscribing](#unsubscribe) in practice.
+
+<TypeTable
+  type={{
+    signal: {
+      type: "unknown",
+      required: true,
+      description: "The value to wait on. Non-AbortSignal values are ignored.",
+    },
+    options: {
+      type: "ToAbortPromiseOptions",
+      description: "Cleanup options for the wait. Everything except cleanupSignal is ignored.",
+    },
+  }}
+/>
+
+## Behavior [#behavior]
+
+| Input | Result |
+| --- | --- |
+| Non-aborted signal | Stays pending until abort, then rejects with the reason. |
+| Aborted signal | Immediately rejects with the reason, regardless of cleanupSignal. |
+| Non-`AbortSignal` | Stays pending without touching cleanupSignal. |
+| Aborted cleanupSignal | Creates neither subscription and stays pending. |
+| cleanupSignal aborts | Stops the wait and stays pending. Later abortion of signal never rejects. |
+| Anything except cleanupSignal | Subscribes to signal only and rejects with the reason on abort. |
+| signal and cleanupSignal identical | Rejects with the reason on abort. Stays pending if dispose comes first. |
+
+The abort reason rejects as-is. `Error` keeps its identity; `null` and `0` arrive unchanged. Abortion without a reason delivers the default `AbortError`.
+
+It never resolves on success. The return value is `PromiseLike<never>`, so `then` success callbacks are never called. Use it with `await` or `Promise.resolve()`.
+
+```ts
+const controller = new AbortController();
+const wait = toAbortPromise(controller.signal);
+
+controller.abort("stop");
+await expect(Promise.resolve(wait)).rejects.toBe("stop");
+```
+
+:::warning
+A non-`AbortSignal` waits forever. If it is the only counterpart in `Promise.race`, processing stalls — always pair it with a `Promise` that actually runs.
+:::
+
+No subscription to signal or cleanupSignal remains after abortion.
+
+## Unsubscribing [#unsubscribe]
+
+Call `dispose` to unsubscribe once the wait is no longer needed. When the other side of `Promise.race` may finish first, always clean up in `finally`.
+
+```ts
+import { toAbortPromise } from "abort-signal-utils";
+
+const wait = toAbortPromise(signal);
+
+try {
+  await Promise.race([job(), wait]);
+} finally {
+  wait.dispose();
+}
+```
+
+To stop the wait with another signal, pass `cleanupSignal`. When `cleanupSignal` aborts, the wait stops and stays pending.
+
+```ts
+const wait = toAbortPromise(signal, { cleanupSignal: stopSignal });
+
+try {
+  await Promise.race([job(), wait]);
+} finally {
+  wait.dispose();
+}
+```
+
+With `using`, the same cleanup happens without writing `finally`.
+
+```ts
+{
+  using wait = toAbortPromise(signal);
+  await Promise.race([job(), wait]);
+}
+```
+
+:::tip
+`dispose` works in every environment. `using` only works where `Symbol.dispose` exists.
+:::
+
+Derived promises from `then` or `Promise.resolve()` have no `dispose`. Call cleanup on the original `wait`.
+
+:::warning
+Abortion of `cleanupSignal` stays pending instead of rejecting. To treat abortion as a failure, combine it into the `signal` side before waiting.
+:::
+
+## Common uses [#recipes]
+
+### Race a task against abortion [#race]
+
+```ts
+await Promise.race([
+  fetch("/api/items", { signal }),
+  toAbortPromise(signal),
+]);
+```
+
+When fetch itself accepts `signal`, this extra wait is unnecessary. Use it with follow-up work or waits that fetch cannot cover.
+
+### Tie cleanup to abortion [#cleanup]
+
+```ts
+const wait = toAbortPromise(signal);
+
+try {
+  await Promise.race([job(), wait]);
+} catch (reason) {
+  await release();
+  throw reason;
+} finally {
+  wait.dispose();
+}
+```
+
+The abort reason rejects as-is. `Error` keeps its identity; `null` and `0` arrive unchanged. Abortion without a reason delivers the default `AbortError`.
+
+To race the execution itself, use [Running with a signal](/api/with-signal).
+
+## Implementation notes [#notes]
+
+Abort subscriptions do not linger after firing. Aborted inputs are never subscribed and reject immediately. The returned value is a lightweight `PromiseLike`; wrap it with `Promise.resolve()` where a native `Promise` is required.

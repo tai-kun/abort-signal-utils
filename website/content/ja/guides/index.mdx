@@ -7,7 +7,7 @@ description: "fetch のタイムアウトや複数の中断元の束ね方など
 
 ## fetch にタイムアウトを付ける [#fetch-timeout]
 
-`timeoutSignal` と `combineSignals` を組むのが最短です。
+`timeoutSignal` と `combineSignals` を組むのが最も簡単です。
 
 ```ts
 import { combineSignals, timeoutSignal } from "abort-signal-utils";
@@ -18,12 +18,12 @@ const response = await fetch("/api/items", {
 ```
 
 :::tip
-タイムアウト単体なら `timeoutSignal(5_000)` を直接渡せます。`combineSignals` が要るのは、ユーザー操作など 2 つ以上の元を束ねるときだけです。
+タイムアウト単体なら `timeoutSignal(5_000)` を直接渡せます。`combineSignals` が必要なのは、ユーザー操作など 2 つ以上の中断元を束ねるときだけです。
 :::
 
 ## ユーザー操作とタイムアウトを両立する [#combine-sources]
 
-任意の中断元は選別せずに渡せます。`undefined` のまま混ぜても壊れません。
+任意の中断元は選別せずに渡せます。`undefined` のまま混ぜても問題なく動きます。
 
 ```ts
 import { combineSignals, timeoutSignal } from "abort-signal-utils";
@@ -34,11 +34,11 @@ async function load(userSignal?: AbortSignal): Promise<Response> {
 }
 ```
 
-すでに中断済みが混ざっていれば、返されたシグナルも即座に中断済みになります。呼び出し側で事前検査は不要です。
+すでに中断済みのシグナルが混ざっていれば、返されたシグナルも即座に中断済みになります。呼び出し側で事前検査は不要です。
 
 ## ループを中断可能にする [#cancellable-loop]
 
-区切りの処理の先頭で `throwIfAborted` を呼びます。
+ループの区切りで `throwIfAborted` を呼びます。
 
 ```ts
 import { throwIfAborted } from "abort-signal-utils";
@@ -64,7 +64,7 @@ if (signal.aborted) {
 
 ## 待機を中断に連動させる [#abortable-wait]
 
-`fetch` が使えない待機は、`Promise.race` と `toAbortPromise` で中断できます。待ちが不要になったら `finally` で `dispose` します。詳しい解除手順は [中断の待機](/api/to-abort-promise#unsubscribe) を参照してください。
+`fetch` が使えない待機は、`Promise.race` と `toAbortPromise` で中断に連動できます。待ちが不要になったら `finally` で `dispose` します。詳しい解除手順は [中断の待機](/api/to-abort-promise#unsubscribe) を参照してください。
 
 ```ts
 import { toAbortPromise } from "abort-signal-utils";
@@ -78,7 +78,7 @@ try {
 }
 ```
 
-後片付けまで含める場合は、理由を再送出して呼び出し元に伝えます。
+後片付けも行う場合は、理由を再送出して呼び出し元に伝えます。
 
 ```ts
 const wait = toAbortPromise(signal);
@@ -95,7 +95,7 @@ try {
 
 ## 実行まで含めて競争させる [#race-with-signal]
 
-`Promise.race` と後片付けをまとめたい場合は `withSignal` を使います。中断済みなら関数を呼ばず、後片付けも不要です。詳しくは [中断付き実行](/api/with-signal) を参照してください。
+`Promise.race` と後片付けをまとめたい場合は `withSignal` を使います。中断済みなら渡した関数を呼ばず、後片付けも不要です。詳しくは [中断付き実行](/api/with-signal) を参照してください。
 
 ```ts
 import { withSignal } from "abort-signal-utils";
@@ -120,5 +120,5 @@ function bind(signal?: AbortSignal): AbortSignal {
 ```
 
 :::warning
-`Fast` が返す単一シグナルは元のオブジェクトと同一です。結果だけを独立に扱いたい経路では `combineSignals` のままにしてください。
+`Fast` が返す単一シグナルは元のオブジェクトと同一です。結果を独立したオブジェクトとして扱いたい場合は `combineSignals` のままにしてください。
 :::

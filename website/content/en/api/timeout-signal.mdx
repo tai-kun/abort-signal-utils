@@ -1,0 +1,137 @@
+---
+title: "Timeout"
+description: "How to create a signal that aborts after a delay with timeoutSignal."
+---
+
+`timeoutSignal` returns a new `AbortSignal` that aborts after a delay. Use it for fetch timeouts or together with `combineSignals`.
+
+```ts
+import { timeoutSignal } from "abort-signal-utils";
+
+await fetch("/api/items", { signal: timeoutSignal(5_000) });
+```
+
+This minimal example is single-use. The created signal cannot be cancelled, so stop the timer with [cleanup](#cleanup) once it is no longer needed.
+
+<TypeTable
+  type={{
+    ms: {
+      type: "number",
+      required: true,
+      description: "Delay in milliseconds. Accepts integers from 0 to Number.MAX_SAFE_INTEGER.",
+    },
+    options: {
+      type: "TimeoutSignalOptions",
+      description: "Reason and cleanup options. Everything except reason and cleanupSignal is ignored.",
+    },
+  }}
+/>
+
+## Behavior [#behavior]
+
+| Input | Result |
+| --- | --- |
+| Non-numeric `ms` | Throws `TypeError`. |
+| Fractional, negative, `NaN`, `Infinity`, or over-limit `ms` | Throws `RangeError`. |
+| Right after the call | Returns non-aborted. Even with `ms` of `0`, aborts on the next tick. |
+| Time passing | Aborts with the default `TimeoutError` `DOMException`. |
+| `reason` given | Aborts with that value as-is. Falsy values such as `null` and `0` are preserved. |
+| `reason` omitted / `undefined` | Aborts with the default `TimeoutError`. |
+| `cleanupSignal` aborts | Stops the timer and stays non-aborted. Never aborts when the time comes. |
+| Aborted `cleanupSignal` | Creates no timer and returns non-aborted. |
+| Timer firing vs. `cleanupSignal` abort racing | Whichever happens first wins. Abortion of `cleanupSignal` after firing does nothing. |
+| Multiple calls | Return independent signals that never interfere. |
+
+The default reason has `name` `TimeoutError` and `message` `The operation was aborted due to timeout`. It is created as a `DOMException`, so the `catch` side can tell it apart by name.
+
+```ts
+const signal = timeoutSignal(5_000);
+console.log(signal.aborted); // false (non-aborted right after the call)
+
+await new Promise((resolve) => setTimeout(resolve, 5_000));
+console.log(signal.aborted); // true
+console.log(signal.reason.name); // "TimeoutError"
+```
+
+To change the abort reason, pass `reason`.
+
+```ts
+const signal = timeoutSignal(5_000, { reason: "too-slow" });
+// reason becomes "too-slow" when the time comes.
+```
+
+:::warning
+The created signal cannot be cancelled. But aborting `cleanupSignal` stops the timer. The result itself can never go back to non-aborted.
+:::
+
+## Common uses [#recipes]
+
+### Add a timeout to fetch [#fetch-timeout]
+
+```ts
+import { timeoutSignal } from "abort-signal-utils";
+
+await fetch("/api/items", { signal: timeoutSignal(5_000) });
+```
+
+Functions that accept a `signal`, like `fetch`, stop on timeout when passed through. To tell the reason apart, check whether the rejection reason's `name` is `TimeoutError`.
+
+```ts
+try {
+  await fetch("/api/items", { signal: timeoutSignal(5_000) });
+} catch (reason) {
+  if (reason instanceof DOMException && reason.name === "TimeoutError") {
+    console.log("Timed out.");
+  }
+  throw reason;
+}
+```
+
+### Combine user input and a timeout [#combine]
+
+```ts
+import { combineSignals, timeoutSignal } from "abort-signal-utils";
+
+const combined = combineSignals([userSignal, timeoutSignal(5_000)]);
+
+await fetch("/api/items", { signal: combined });
+```
+
+Whichever comes first — user input or timeout — aborts the fetch. The reason of the first one remains, so `reason` tells which side stopped it.
+
+### Clean up the timer [#cleanup]
+
+```ts
+import { timeoutSignal } from "abort-signal-utils";
+
+const cleanup = new AbortController();
+const signal = timeoutSignal(60_000, { cleanupSignal: cleanup.signal });
+
+try {
+  await fetch("/api/items", { signal });
+} finally {
+  // Stop the timer once the work is done.
+  // signal stays non-aborted, and no later firing happens.
+  cleanup.abort();
+}
+```
+
+When work usually finishes before the timeout, stop the timer this way. For long waits, clean up the same way.
+
+:::tip
+Passing an aborted `cleanupSignal` creates no timer from the start. Reused signals are safe to pass.
+:::
+
+## Implementation notes [#notes]
+
+Use it for practical durations. Values up to `Number.MAX_SAFE_INTEGER` are accepted. But actually waiting the full limit needs about 4 million reschedules and is not realistic. Large values wait in split chunks.
+
+Once the timer is no longer needed, abort `cleanupSignal` to clean up. The timer subscription remains while the result is non-aborted.
+
+Where `AbortSignal.timeout` exists, delegates to it when neither `reason` nor `cleanupSignal` is given and the duration is in a practical range. Otherwise uses a fallback. With `reason` or `cleanupSignal` given, always uses the same fallback in every environment.
+
+Differences from native `AbortSignal.timeout`:
+
+- `reason` and `cleanupSignal` can be given.
+- Values up to `Number.MAX_SAFE_INTEGER` are accepted.
+- No clock correction when paused in a debugger; aborts by elapsed time.

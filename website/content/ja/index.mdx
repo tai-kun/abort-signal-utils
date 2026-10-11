@@ -3,7 +3,7 @@ title: "Abort Signal Utils"
 description: "AbortSignal 関連の小さなユーティリティーです。"
 ---
 
-`AbortSignal` の定型処理を切り出した、小さな ESM ライブラリーです。複数のシグナルを 1 つに束ねる、中断済みかどうかを確かめる、中断を `Promise` として待つ、といった処理を、古いランタイムでも同じ書き方で書けます。
+`AbortSignal` の定型処理を切り出した、小さな ESM ライブラリーです。複数のシグナルを 1 つに束ねる処理や、中断済みかどうかを確かめる処理、中断を `Promise` として待つ処理などを、古いランタイムでも同じ書き方で扱えます。
 
 <CardGroup cols={3}>
   <Card title="はじめに" href="/getting-started" icon="rocket">
@@ -28,7 +28,7 @@ description: "AbortSignal 関連の小さなユーティリティーです。"
 | 中断を `Promise` として待つ | `toAbortPromise` |
 | 処理と中断を競争させる | `withSignal` |
 
-`withSignal` を除き、いずれも `AbortSignal` 以外の値を渡しても壊れません。`undefined` や `null` が混ざりうる引数は、そのまま配列や引数に入れてください。選別や分岐は不要です。`withSignal` の `signal` には `AbortSignal` を渡してください。
+`withSignal` を除き、いずれも `AbortSignal` 以外の値を渡してもエラーになりません。`undefined` や `null` が混ざる可能性のある引数は、そのまま配列や引数に入れてください。選別や分岐は不要です。`withSignal` の `signal` には `AbortSignal` を渡してください。
 
 ## 最小例 [#quick-example]
 
@@ -49,7 +49,7 @@ async function run(signal: AbortSignal): Promise<void> {
 
 中断理由は文字列や `Error` だけでなく、`null` や `0` などの falsy な値もそのまま引き継ぎます。値の有無ではなく、中断した事実で分岐してください。
 
-実行まで含めて競争させる場合は `withSignal` を使います。
+処理の実行まで含めて競争させる場合は `withSignal` を使います。
 
 ```ts
 import { withSignal } from "abort-signal-utils";
@@ -79,6 +79,6 @@ ESM 専用で、副作用はありません。バンドラーでも Node.js で�
 
 ## 対応環境 [#compatibility]
 
-`AbortSignal.any` と `AbortSignal.prototype.throwIfAborted` がある環境ではネイティブ実装に委譲します。ない環境では同等の代替実装で動きます。実行のたびに有無を判定するため、ポリフィルを後から足してもそのまま使えます。
+`AbortSignal.any` と `AbortSignal.prototype.throwIfAborted` がある環境ではネイティブ実装に委譲します。ない環境では同等の代替実装で動きます。実行のたびに対応の有無を判定するため、ポリフィルを後から足してもそのまま使えます。
 
-`timeoutSignal` は `AbortSignal.timeout` がある環境では条件付きで委譲します。ない環境では代替実装で動きます。
+`timeoutSignal` は `AbortSignal.timeout` がある環境では、条件がそろえば委譲します。ない環境では代替実装で動きます。

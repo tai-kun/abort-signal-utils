@@ -22,7 +22,7 @@ await next();
 ```
 
 :::warning
-中断理由の有無で中断を判定しないでください。理由が `null` や `0` の中断もあります。判定は `signal.aborted` か、この 2 関数の振る舞いで行います。
+中断理由の有無で中断を判定しないでください。理由が `null` や `0` の中断もあります。判定は `signal.aborted` の確認か、この 2 関数の振る舞いで行います。
 :::
 
 ## getAbortReason [#get-abort-reason]
@@ -80,7 +80,7 @@ throwIfAborted(signal);
 - `AbortSignal` 以外では何も投げません。任意引数の検査に分岐は不要です。
 - 未中断では何も投げません。
 - 中断済みなら中断理由を投げます。`Error` は同一インスタンス、`null` や `0` もそのまま投げます。
-- `AbortSignal.prototype.throwIfAborted` がある環境では委譲し、ない環境では理由を直接投げます。呼び出すたびに判定するため、ポリフィルの後付けにも追従します。
+- `AbortSignal.prototype.throwIfAborted` がある環境では委譲し、ない環境では理由を直接投げます。呼び出すたびに判定するため、ポリフィルを後から追加しても追従します。
 
 ```ts
 async function poll(signal: AbortSignal): Promise<void> {

@@ -1,0 +1,74 @@
+---
+title: "Getting Started"
+description: "From installation to the basic combine, inspect, and wait operations in a few minutes."
+---
+
+This page walks through installation and the three basic operations. By the end, you will be able to combine fetch abortion with a timeout.
+
+<Steps>
+  <Step title="Install">
+    Add it with your package manager.
+
+    ```package-install
+    npm i abort-signal-utils
+    ```
+  </Step>
+  <Step title="Combine signals">
+    Merge multiple abort sources — such as user input and a timeout — into one with `combineSignals`.
+
+    ```ts
+    import { combineSignals, timeoutSignal } from "abort-signal-utils";
+
+    const stop = new AbortController();
+    const combined = combineSignals([stop.signal, timeoutSignal(5_000)]);
+
+    await fetch("/api/items", { signal: combined });
+    ```
+
+    Whichever aborts first — `stop.signal` or the timeout — its reason is forwarded to `combined`.
+  </Step>
+  <Step title="Inspect abortion">
+    Call `throwIfAborted` at checkpoints to throw the reason when already aborted.
+
+    ```ts
+    import { throwIfAborted } from "abort-signal-utils";
+
+    async function poll(signal: AbortSignal): Promise<void> {
+      for (;;) {
+        throwIfAborted(signal);
+        await work();
+      }
+    }
+    ```
+
+    Non-`AbortSignal` values are ignored, so optional arguments need no branching.
+  </Step>
+  <Step title="Wait for abortion">
+    `toAbortPromise` returns a `Promise` that rejects with the reason on abort. Combined with `Promise.race` it keeps cleanup short.
+
+    ```ts
+    import { toAbortPromise } from "abort-signal-utils";
+
+    await Promise.race([run(), toAbortPromise(signal)]);
+    ```
+  </Step>
+</Steps>
+
+## Three guarantees [#promises]
+
+The functions in this library share three premises. Remember them and you will write fewer branches.
+
+- Non-`AbortSignal` values are ignored. Pass `null` or `undefined` through as-is.
+- Abort reasons are kept as-is. Falsy values such as `null` and `0` are preserved, and `Error` keeps its identity.
+- Branch on `aborted`, not on the presence of a reason. `getAbortReason` returns `undefined` when not aborted.
+
+## Next steps [#next-steps]
+
+<CardGroup cols={2}>
+  <Card title="API Reference" href="/api" icon="book-open">
+    Check the spec of all 7 functions and how to choose between them.
+  </Card>
+  <Card title="Recipes" href="/guides" icon="cooking-pot">
+    See real-world examples of timeouts and combined abortion.
+  </Card>
+</CardGroup>

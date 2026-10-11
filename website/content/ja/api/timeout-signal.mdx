@@ -11,7 +11,7 @@ import { timeoutSignal } from "abort-signal-utils";
 await fetch("/api/items", { signal: timeoutSignal(5_000) });
 ```
 
-上は使い捨ての最小例です。作ったシグナルを取り消す手段はないため、タイマーが不要になったら[後始末](#cleanup)で止めてください。
+上の例は使い捨ての最小例です。作ったシグナルを取り消す手段はないため、タイマーが不要になったら[後始末](#cleanup)で止めてください。
 
 <TypeTable
   type={{
@@ -61,7 +61,7 @@ const signal = timeoutSignal(5_000, { reason: "too-slow" });
 ```
 
 :::warning
-作ったシグナルを取り消す手段はありません。唯一の例外は `cleanupSignal` の中断でタイマーを止められる点です。結果自体を未中断に戻すことはできません。
+作ったシグナルを取り消す手段はありません。ただし `cleanupSignal` を中断すればタイマーを止められます。結果自体を未中断に戻すことはできません。
 :::
 
 ## よくある使い方 [#recipes]
@@ -74,7 +74,7 @@ import { timeoutSignal } from "abort-signal-utils";
 await fetch("/api/items", { signal: timeoutSignal(5_000) });
 ```
 
-`fetch` のように `signal` を受けられる関数は、そのまま渡すと時間切れで止まります。理由を判別したい場合は、拒否理由の `name` が `TimeoutError` かを見てください。
+`fetch` のように `signal` を受けられる関数は、そのまま渡すと時間切れで止まります。理由を判別したい場合は、拒否理由の `name` が `TimeoutError` かどうかを見てください。
 
 ```ts
 try {
@@ -116,7 +116,7 @@ try {
 }
 ```
 
-タイムアウト前に処理が終わることが多い場合は、この形でタイマーを止めてください。長時間待つ場合も同様です。
+タイムアウト前に処理が終わることが多い場合は、この形でタイマーを止めてください。長時間待つ場合も、同じ形で後始末してください。
 
 :::tip
 中断済みの `cleanupSignal` を渡すと、最初からタイマーを作りません。使い回しの合図を渡す場合も安全です。
@@ -124,11 +124,11 @@ try {
 
 ## 実装の注意 [#notes]
 
-実用的な範囲の時間で使ってください。上限の `Number.MAX_SAFE_INTEGER` まで受け付けます。ただし上限いっぱいの完走には約 400 万回の再予約が必要になり、現実的ではありません。大きな値は内部で分割して待ちます。
+実用的な範囲の時間で使ってください。上限の `Number.MAX_SAFE_INTEGER` まで受け付けます。ただし上限いっぱいまで実際に待つには約 400 万回の再予約が必要になり、現実的ではありません。大きな値は内部で分割して待ちます。
 
 タイマーが不要になったら、`cleanupSignal` の中断で後始末してください。結果が未中断の間はタイマーの購読が残ります。
 
-`AbortSignal.timeout` がある環境では、`reason` も `cleanupSignal` も指定せず時間が実用的な範囲なら委譲します。ない環境では代替実装で動きます。`reason` や `cleanupSignal` を指定したときは、どの環境でも同じ代替実装で動きます。
+`AbortSignal.timeout` がある環境では、`reason` も `cleanupSignal` も指定せず、時間が実用的な範囲なら委譲します。ない環境では代替実装で動きます。`reason` や `cleanupSignal` を指定したときは、どの環境でも同じ代替実装で動きます。
 
 ネイティブの `AbortSignal.timeout` との差分は次の 3 点です。
 

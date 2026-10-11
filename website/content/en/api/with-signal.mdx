@@ -1,0 +1,91 @@
+---
+title: "Running with a signal"
+description: "How to race a task against abortion with withSignal."
+---
+
+`withSignal` races task execution against abortion. It folds `Promise.race` and cleanup into a single call.
+
+```ts
+import { withSignal } from "abort-signal-utils";
+
+await withSignal(signal, () => run());
+```
+
+This minimal example is single-use. If already aborted, `task` is never called and the call rejects with the reason.
+
+<TypeTable
+  type={{
+    signal: {
+      type: "AbortSignal",
+      required: true,
+      description: "The signal to race. If already aborted, rejects with the reason without calling task.",
+    },
+    task: {
+      type: "() => T",
+      required: true,
+      description: "The function to run. Called exactly once when not aborted.",
+    },
+  }}
+/>
+
+## Behavior [#behavior]
+
+| Input               | Result                                                        |
+| ------------------- | ------------------------------------------------------------- |
+| Aborted signal      | Never calls `task`; immediately rejects with the reason.      |
+| Non-aborted signal  | Calls `task` exactly once and races it against abortion.      |
+| `task` finishes first | Resolves with its result; later abortion does nothing.      |
+| Abortion comes first | Rejects with the reason without waiting for `task`.         |
+
+If already aborted, rejects with the reason without calling `task`.
+
+If not aborted, calls `task` exactly once.
+
+It does not stop `task` itself.
+
+No `dispose` needed; use it with no cleanup.
+
+The abort reason rejects as-is. `Error` keeps its identity, and `null` and `0` arrive unchanged. Abortion without a reason delivers the default `AbortError`.
+
+The return value of `task` is awaited and returned. Values thrown by `task` arrive unchanged.
+
+```ts
+const controller = new AbortController();
+controller.abort("stop");
+
+await expect(withSignal(controller.signal, () => run())).rejects.toBe("stop");
+// run is never called.
+```
+
+:::warning
+`task` is not stopped by abortion. Pass `signal` to anything you want to stop so it follows abortion.
+:::
+
+:::warning
+If `task` never settles and no abortion happens, it waits forever. Combine it with tasks guaranteed to finish.
+:::
+
+No abort-wait subscription remains after abortion.
+
+## Common uses [#recipes]
+
+### Race a task against abortion [#race]
+
+```ts
+await withSignal(signal, () => fetch("/api/items", { signal }));
+```
+
+Functions that accept a `signal`, like `fetch`, stop on abortion when passed through. Even with waits that cannot take a signal, the call stays one line.
+
+### Tie cleanup to abortion [#cleanup]
+
+```ts
+try {
+  await withSignal(signal, () => job());
+} catch (reason) {
+  await release();
+  throw reason;
+}
+```
+
+The abort reason rejects as-is, so clean up and then rethrow it to the caller.

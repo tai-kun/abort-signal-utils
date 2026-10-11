@@ -1,0 +1,92 @@
+---
+title: "Inspecting abortion"
+description: "Spec and usage of getAbortReason and throwIfAborted."
+---
+
+Inspecting abortion is a two-way choice. Use `getAbortReason` to branch on the reason, `throwIfAborted` to bail out in a guard clause.
+
+## Which to use [#comparison]
+
+```ts
+import { getAbortReason, throwIfAborted } from "abort-signal-utils";
+
+// Branch on the reason
+const reason = getAbortReason(signal);
+if (reason !== undefined) {
+  cleanup(reason);
+}
+
+// Bail out in a guard clause
+throwIfAborted(signal);
+await next();
+```
+
+:::warning
+Do not judge abortion by the presence of a reason. Abortion with a `null` or `0` reason exists. Check `signal.aborted` or rely on the behavior of these two functions.
+:::
+
+## getAbortReason [#get-abort-reason]
+
+```ts
+import { getAbortReason } from "abort-signal-utils";
+
+const reason: unknown = getAbortReason(signal);
+```
+
+<TypeTable
+  type={{
+    signal: {
+      type: "AbortSignal",
+      required: true,
+      description: "The signal to read the reason from.",
+    },
+  }}
+/>
+
+Spec:
+
+- Returns `undefined` when not aborted.
+- Returns the reason as-is when aborted. `null` and `0` are preserved.
+- In the rare state where a signal is aborted yet its reason is `undefined`, creates and returns a replacement `AbortError` (`DOMException`). The created reason carries a stack.
+
+```ts
+const c = new AbortController();
+console.log(getAbortReason(c.signal)); // undefined
+
+c.abort("stop");
+console.log(getAbortReason(c.signal)); // "stop"
+```
+
+## throwIfAborted [#throw-if-aborted]
+
+```ts
+import { throwIfAborted } from "abort-signal-utils";
+
+throwIfAborted(signal);
+```
+
+<TypeTable
+  type={{
+    signal: {
+      type: "unknown",
+      required: true,
+      description: "The value to check. Does nothing for non-AbortSignal values.",
+    },
+  }}
+/>
+
+Spec:
+
+- Throws nothing for non-`AbortSignal` values. Checking optional arguments needs no branching.
+- Throws nothing when not aborted.
+- Throws the abort reason when aborted. `Error` keeps its identity; `null` and `0` are thrown as-is.
+- Delegates to `AbortSignal.prototype.throwIfAborted` where available, and throws the reason directly elsewhere. Checked on every call, so a polyfill added later is followed.
+
+```ts
+async function poll(signal: AbortSignal): Promise<void> {
+  for (;;) {
+    throwIfAborted(signal); // Throws the reason and exits when aborted.
+    await work();
+  }
+}
+```

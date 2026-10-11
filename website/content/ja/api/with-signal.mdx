@@ -3,7 +3,7 @@ title: "中断付き実行"
 description: "withSignal で処理と中断を競争させる方法です。"
 ---
 
-`withSignal` は、処理の実行と中断を競争させる関数です。`Promise.race` と後片付けを 1 回の呼び出しにまとめられます。
+`withSignal` は、処理の実行と中断を競争させる関数です。`Promise.race` と後片付けを 1 回の呼び出しにまとめます。
 
 ```ts
 import { withSignal } from "abort-signal-utils";
@@ -11,7 +11,7 @@ import { withSignal } from "abort-signal-utils";
 await withSignal(signal, () => run());
 ```
 
-上は使い捨ての最小例です。中断済みなら関数は呼ばれず、その理由で拒否されます。
+上の例は使い捨ての最小例です。中断済みなら `task` は呼ばれず、その理由で拒否されます。
 
 <TypeTable
   type={{
@@ -37,7 +37,7 @@ await withSignal(signal, () => run());
 | `task` が先に終わる | その結果で解決し、その後は中断しても何も起きません。 |
 | 中断が先に起きる    | `task` の完了を待たずに理由で拒否されます。          |
 
-中断済みなら `task` を呼ばず、0 回のまま理由で拒否されます。
+中断済みなら `task` を呼ばずに理由で拒否されます。
 
 未中断なら `task` を 1 回だけ呼びます。
 
@@ -45,9 +45,9 @@ await withSignal(signal, () => run());
 
 `dispose` は不要で、後片付けなしで使えます。
 
-中断理由は値のまま拒否され、`Error` は同一インスタンス、`null` や `0` もそのまま届き、理由なしの中断では既定の `AbortError` が届きます。
+中断理由は値のまま拒否されます。`Error` は同一インスタンスで、`null` や `0` もそのまま届きます。理由なしの中断では既定の `AbortError` が届きます。
 
-`task` の戻り値は `await` されて返り、`task` が投げた理由はそのまま届きます。
+`task` の戻り値は `await` されて返ります。`task` が投げた値はそのまま届きます。
 
 ```ts
 const controller = new AbortController();
@@ -88,4 +88,4 @@ try {
 }
 ```
 
-中断理由は値のまま拒否されるため、後片付けの後に再送出して呼び出し元に伝えます。
+中断理由は値のまま拒否されるため、後片付けの後に再送出して呼び出し元に伝えてください。

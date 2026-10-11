@@ -1,0 +1,124 @@
+---
+title: "Recipes"
+description: "Real-world uses such as fetch timeouts and combining multiple abort sources."
+---
+
+Just the classic combinations, ready to copy and use.
+
+## Add a timeout to fetch [#fetch-timeout]
+
+The easiest way is to combine `timeoutSignal` with `combineSignals`.
+
+```ts
+import { combineSignals, timeoutSignal } from "abort-signal-utils";
+
+const response = await fetch("/api/items", {
+  signal: combineSignals([userSignal, timeoutSignal(5_000)]),
+});
+```
+
+:::tip
+For a timeout alone, pass `timeoutSignal(5_000)` directly. You only need `combineSignals` when merging two or more abort sources such as user input.
+:::
+
+## Combine user input and a timeout [#combine-sources]
+
+Optional abort sources can be passed without filtering. Mixing in `undefined` works fine.
+
+```ts
+import { combineSignals, timeoutSignal } from "abort-signal-utils";
+
+async function load(userSignal?: AbortSignal): Promise<Response> {
+  const signal = combineSignals([userSignal, timeoutSignal(5_000)]);
+  return fetch("/api/items", { signal });
+}
+```
+
+If an already-aborted signal is mixed in, the returned signal is immediately aborted too. No pre-check needed on the caller side.
+
+## Make a loop cancellable [#cancellable-loop]
+
+Call `throwIfAborted` at loop boundaries.
+
+```ts
+import { throwIfAborted } from "abort-signal-utils";
+
+async function drain(queue: Task[], signal: AbortSignal): Promise<void> {
+  for (const task of queue) {
+    throwIfAborted(signal);
+    await task.run();
+  }
+}
+```
+
+To branch on the reason, use `getAbortReason`. Reasons can be `null` or `0`, so check `aborted` rather than the presence of a value.
+
+```ts
+import { getAbortReason } from "abort-signal-utils";
+
+const reason = getAbortReason(signal);
+if (signal.aborted) {
+  log("Aborted", reason);
+}
+```
+
+## Link waiting to abortion [#abortable-wait]
+
+Waits that cannot use `fetch` can follow abortion with `Promise.race` and `toAbortPromise`. Call `dispose` in `finally` once the wait is no longer needed. See [Waiting for abortion](/api/to-abort-promise#unsubscribe) for the full steps.
+
+```ts
+import { toAbortPromise } from "abort-signal-utils";
+
+const wait = toAbortPromise(signal);
+
+try {
+  await Promise.race([job(), wait]);
+} finally {
+  wait.dispose();
+}
+```
+
+When cleanup is also needed, rethrow the reason so the caller sees it.
+
+```ts
+const wait = toAbortPromise(signal);
+
+try {
+  await Promise.race([job(), wait]);
+} catch (reason) {
+  await release();
+  throw reason;
+} finally {
+  wait.dispose();
+}
+```
+
+## Race the execution itself [#race-with-signal]
+
+To fold `Promise.race` and cleanup into one call, use `withSignal`. If already aborted it never calls the function and needs no cleanup. See [Running with a signal](/api/with-signal) for details.
+
+```ts
+import { withSignal } from "abort-signal-utils";
+
+await withSignal(signal, () => job());
+```
+
+:::warning
+`task` is not stopped by abortion. Pass `signal` to anything you want to stop so it follows abortion.
+:::
+
+## Trim allocations on hot paths [#fast-path]
+
+On paths where a single signal is common, switch to `combineSignalsFast`. It returns the single valid input with no allocation.
+
+```ts
+import { combineSignalsFast, timeoutSignal } from "abort-signal-utils";
+
+function bind(signal?: AbortSignal): AbortSignal {
+  return combineSignalsFast([signal, timeoutSignal(5_000)]);
+}
+```
+
+:::warning
+A single signal returned by `Fast` is identical to the original object. Keep using `combineSignals` when the result must be an independent object.
+:::

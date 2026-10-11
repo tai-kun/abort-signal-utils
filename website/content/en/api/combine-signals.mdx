@@ -1,0 +1,122 @@
+---
+title: "Combining signals"
+description: "Spec and usage of combineSignals and combineSignalsFast."
+---
+
+Combine multiple `AbortSignal`s into one. Non-`AbortSignal` values are ignored, so optional abort sources can be passed without filtering.
+
+## Which to use [#comparison]
+
+| Function | Returns | For |
+| --- | --- | --- |
+| `combineSignals` | Always a new signal | Default choice |
+| `combineSignalsFast` | Returns the input as-is for a single signal | Hot paths with many single signals |
+
+Use `combineSignals` when you need an independent object. A single signal returned by `Fast` is identical to the original and cannot be told apart.
+
+```ts
+import { combineSignals, combineSignalsFast } from "abort-signal-utils";
+
+// Default
+const s1 = combineSignals([a, b]); // Always new
+// Only when optimizing
+const s2 = combineSignalsFast([a]); // Identical to a
+```
+
+## combineSignals [#combine-signals]
+
+```ts
+import combineSignals from "abort-signal-utils";
+
+const combined: AbortSignal = combineSignals(signals, options);
+```
+
+<TypeTable
+  type={{
+    signals: {
+      type: "readonly unknown[]",
+      required: true,
+      description: "Values to combine. Non-AbortSignal values are ignored.",
+    },
+    options: {
+      type: "CombineSignalsOptions",
+      description: "Cleanup options for the combination. Everything except cleanupSignal is ignored.",
+    },
+  }}
+/>
+
+Spec:
+
+- When any input aborts, the result aborts with the first abort reason.
+- If an aborted signal is included, the result is immediately aborted with its reason. With several, the earlier aborted signal wins. `cleanupSignal` is left untouched.
+- With no valid signals, returns a new non-aborted signal. `cleanupSignal` is left untouched.
+- Returns an independent new signal on every call and never mutates the input array.
+- Delegates to `AbortSignal.any` where available, and combines with an equivalent fallback elsewhere. With a non-aborted `cleanupSignal`, always uses the fallback so the unsubscribe behavior stays the same everywhere.
+- While the result is non-aborted, subscriptions to the inputs remain. Once an input aborts the result, the subscriptions to the inputs and `cleanupSignal` are removed.
+- Abortion of `cleanupSignal` does not abort the result; it stays non-aborted. It stops the input subscriptions, so later input abortion is no longer forwarded.
+- With `cleanupSignal` omitted or aborted, only the inputs are combined. Passing an aborted `cleanupSignal` keeps the input subscriptions as usual. Passing the same object as both an input and `cleanupSignal` treats it as an input on abort.
+
+```ts
+import { combineSignals, timeoutSignal } from "abort-signal-utils";
+
+const stop = new AbortController();
+const combined = combineSignals([stop.signal, timeoutSignal(5_000), undefined]);
+
+stop.abort("user-stop"); // combined.reason becomes "user-stop".
+```
+
+:::warning
+A result combined by the fallback keeps its input subscriptions while non-aborted. They are removed when an input or `cleanupSignal` aborts. No subscription occurs when delegating to `AbortSignal.any`. Once the combination is no longer needed, abort `cleanupSignal` to unsubscribe.
+:::
+
+To tie cleanup of the combination to another signal, pass `cleanupSignal`. Once the combination is no longer needed, abort that signal.
+
+```ts
+import { combineSignals, timeoutSignal } from "abort-signal-utils";
+
+const cleanup = new AbortController();
+const combined = combineSignals([userSignal, timeoutSignal(5_000)], {
+  cleanupSignal: cleanup.signal,
+});
+
+// Once the combination is no longer needed, abort to unsubscribe.
+// combined stays non-aborted, and later input abortion is no longer forwarded.
+cleanup.abort();
+```
+
+## combineSignalsFast [#combine-signals-fast]
+
+```ts
+import { combineSignalsFast } from "abort-signal-utils";
+
+const combined: AbortSignal = combineSignalsFast(signals, options);
+```
+
+The options mean the same as `combineSignals`. Spec:
+
+- With a single valid signal plus a non-aborted `cleanupSignal`, delegates to `combineSignals` and returns a new signal. You can unsubscribe by aborting `cleanupSignal`.
+- With a single valid signal and `cleanupSignal` omitted or aborted, returns it as-is with no new allocation. An aborted input is returned as-is without touching `cleanupSignal`.
+- With no valid signals, returns a new non-aborted signal. `cleanupSignal` is left untouched.
+- With two or more valid signals, delegates to `combineSignals` with `options`.
+
+```ts
+const single = combineSignalsFast([controller.signal, undefined]);
+console.log(single === controller.signal); // true
+```
+
+:::warning
+A returned single signal is identical to the original object. You cannot later treat "only the combined result aborts" separately. Use `combineSignals` when independence matters.
+:::
+
+## Reason forwarding [#reason]
+
+Abort reasons are forwarded as-is. `Error` keeps its identity, and falsy values such as `null` and `0` are preserved. Abortion without a reason forwards the runtime's default `AbortError`.
+
+```ts
+const err = new Error("boom");
+const c = new AbortController();
+c.abort(err);
+
+const combined = combineSignals([c.signal]);
+console.log(combined.reason === err); // true
+```

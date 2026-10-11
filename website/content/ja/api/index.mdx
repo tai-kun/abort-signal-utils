@@ -26,7 +26,7 @@ description: "7 つの関数の仕様と使い分けを 1 ページで見渡し�
 | 通常はこちら | `combineSignals` |
 | 単一シグナルが多く、割り当てを削りたい | `combineSignalsFast` |
 
-`Fast` は有効なシグナルが 1 つだけならそれ自体を返します。返されたシグナルが元のオブジェクトと区別できなくなるため、独立したオブジェクトが要る場合は `combineSignals` を使ってください。詳しくは [シグナルの結合](/api/combine-signals) を参照してください。
+`Fast` は有効なシグナルが 1 つだけならそれ自体を返します。返されたシグナルを元のオブジェクトと区別できなくなるため、独立したオブジェクトが必要な場合は `combineSignals` を使ってください。詳しくは [シグナルの結合](/api/combine-signals) を参照してください。
 
 ### 検査は 2 択 [#inspect]
 
@@ -53,9 +53,9 @@ await next();
 
 ### 待機と実行 [#wait]
 
-中断を `await` や `Promise.race` に組み込みたい場合は `toAbortPromise` を使います。成功では解決せず、中断時に理由で拒否されます。待ちが不要になったら `dispose` で購読を解除できます。詳しくは [中断の待機](/api/to-abort-promise) を、後始末の手順は [購読の解除](/api/to-abort-promise#unsubscribe) を参照してください。
+中断を `await` や `Promise.race` に組み込みたい場合は `toAbortPromise` を使います。成功では解決せず、中断時に理由で拒否されます。待ちが不要になったら `dispose` で購読を解除できます。詳しくは [中断の待機](/api/to-abort-promise) を参照してください。後始末の手順は [購読の解除](/api/to-abort-promise#unsubscribe) にまとめています。
 
-処理の実行まで含めて競争させたい場合は `withSignal` を使います。中断済みなら関数を呼ばず、未中断なら 1 回だけ呼んで中断と競争させます。後片付けは不要です。詳しくは [中断付き実行](/api/with-signal) を参照してください。
+処理の実行まで含めて競争させたい場合は `withSignal` を使います。中断済みなら `task` を呼ばず、未中断なら 1 回だけ呼んで中断と競争させます。後片付けは不要です。詳しくは [中断付き実行](/api/with-signal) を参照してください。
 
 指定時間後に中断するシグナルが要る場合は `timeoutSignal` を使います。詳しくは [タイムアウト](/api/timeout-signal) を参照してください。
 
@@ -63,7 +63,7 @@ await next();
 
 個々のページを読む前に、ここだけ押さえてください。
 
-- `withSignal` を除き、`combineSignals` 系、`throwIfAborted`、`toAbortPromise` と `timeoutSignal` の `cleanupSignal` は `AbortSignal` 以外を無視します。任意の signal 引数は選別せずに渡せます。ただし `timeoutSignal` の `ms` は例外で、不正な値はすぐに投げます。
+- `withSignal` を除き、`combineSignals` 系と `throwIfAborted`、`toAbortPromise`、`timeoutSignal` の `cleanupSignal` は `AbortSignal` 以外を無視します。任意の signal 引数は選別せずに渡せます。ただし `timeoutSignal` の `ms` は例外で、不正な値はすぐに投げます。
 - `withSignal` の `signal` には `AbortSignal` を渡してください。中断済みなら関数を呼ばずに理由で拒否されます。
 - 中断理由は値のまま引き継ぎます。`null` や `0` などの falsy な値も潰さず、`Error` は同一インスタンスを保ちます。
 - 理由なしの中断では、実行環境の既定の `AbortError`（`DOMException`）を使います。理由が `undefined` のまま中断している稀な状態では、代替の `AbortError` を生成します。ただし `timeoutSignal` の既定は `TimeoutError`（`DOMException`）です。
