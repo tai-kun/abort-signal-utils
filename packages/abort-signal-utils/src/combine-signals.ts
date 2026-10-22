@@ -58,12 +58,20 @@ export default function combineSignals(
   }
 
   if (typeof AbortSignal.any === "function") {
-    return AbortSignal.any(validSignals);
+    const combined = AbortSignal.any(validSignals);
+
+    // Node.js の AbortSignal.any は abort リスナーがないと reason を遅延評価し、複数の入力が中断した場合に最初の中断理由を保持しないことがあります。
+    // 振る舞いを安定させるため、中断時に何もしないリスナーを 1 つ登録します。
+    combined.addEventListener("abort", noop, { once: true });
+
+    return combined;
   }
 
   // ネイティブがない場合は cleanupSignal なしの代替実装で結合します。
   return combineManually(validSignals, undefined);
 }
+
+function noop(): void {}
 
 /**
  * 入力と cleanupSignal を手作業で束ねます。
