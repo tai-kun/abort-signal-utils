@@ -256,6 +256,21 @@ describe("競合の場合", () => {
     expect(calls).toBe(1);
   });
 
+  test("task 内の同期的な中断が先なら中断理由で拒否される", async ({ expect }) => {
+    // 準備
+    const controller = new AbortController();
+
+    // 実行
+    const result = withSignal(controller.signal, () => {
+      controller.abort("sync-boom");
+
+      return "ok";
+    });
+
+    // 検証
+    await expect(result).rejects.toBe("sync-boom");
+  });
+
   test("作業が先なら作業結果で確定する", async ({ expect }) => {
     // 準備
     const controller = new AbortController();
