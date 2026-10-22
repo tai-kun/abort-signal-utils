@@ -1,5 +1,6 @@
 import combineSignals from "./combine-signals.js";
 import type { CombineSignalsOptions } from "./combine-signals.js";
+import asAbortSignal from "./internal/abort-signal.js";
 
 /**
  * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/combine-signals#combine-signals-fast)
@@ -32,7 +33,7 @@ export default function combineSignalsFast(
     return single;
   }
 
-  const { cleanupSignal } = options;
+  const cleanupSignal = asAbortSignal(options.cleanupSignal);
   if (cleanupSignal !== undefined && !cleanupSignal.aborted) {
     // 未中断の cleanupSignal がある場合は解除可能にするため新規オブジェクトで結合します。
     return combineSignals(signals, options);

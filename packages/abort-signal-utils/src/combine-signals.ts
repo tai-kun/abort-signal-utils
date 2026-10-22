@@ -1,3 +1,5 @@
+import asAbortSignal from "./internal/abort-signal.js";
+
 /**
  * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/combine-signals)
  */
@@ -42,7 +44,7 @@ export default function combineSignals(
     return new AbortController().signal;
   }
 
-  const { cleanupSignal } = options;
+  const cleanupSignal = asAbortSignal(options.cleanupSignal);
   if (cleanupSignal !== undefined && !cleanupSignal.aborted) {
     if (typeof AbortSignal.any === "function") {
       // ネイティブがあるのに cleanupSignal で代替実装に切り替わることを知らせます。
@@ -56,25 +58,7 @@ export default function combineSignals(
   }
 
   if (typeof AbortSignal.any === "function") {
-    // 全要素が AbortSignal の典型例では配列を作り直さずに渡します。
-    let allValid = true;
-    for (let i = 0; i < signals.length; i++) {
-      if (!(signals[i] instanceof AbortSignal)) {
-        allValid = false;
-        break;
-      }
-    }
-
-    if (allValid) {
-      // AbortSignal.any は入力配列を変更しないため、このキャストは安全です。
-      return AbortSignal.any(signals as unknown as AbortSignal[]);
-    }
-
-    const filteredSignals = signals.filter(
-      (signal): signal is AbortSignal => signal instanceof AbortSignal,
-    );
-
-    return AbortSignal.any(filteredSignals);
+    return AbortSignal.any(validSignals);
   }
 
   // ネイティブがない場合は cleanupSignal なしの代替実装で結合します。
@@ -92,27 +76,24 @@ function combineManually(
 ): AbortSignal {
   const controller = new AbortController();
 
-  function handleAbort(this: AbortSignal): void {
-    // 入力の中断を結果に伝えます。
-    controller.abort(this.reason);
-    // 以後の発火を止めるため全ての購読を解除します。
+  function unsubscribe(): void {
+    // 以後の発火を止めるため、入力と cleanupSignal の購読をまとめて解除します。
     for (const signal of validSignals) {
       signal.removeEventListener("abort", handleAbort);
     }
 
-    // cleanupSignal の購読も解除します。
     cleanupSignal?.removeEventListener("abort", handleCleanup);
   }
 
-  function handleCleanup(): void {
-    // cleanupSignal では結果に触りません。
-    // 以後の発火を止めるため入力の購読を解除します。
-    for (const signal of validSignals) {
-      signal.removeEventListener("abort", handleAbort);
-    }
+  function handleAbort(this: AbortSignal): void {
+    // 入力の中断を結果に伝えます。
+    controller.abort(this.reason);
+    unsubscribe();
+  }
 
-    // cleanupSignal 自身の購読も解除します。
-    cleanupSignal?.removeEventListener("abort", handleCleanup);
+  function handleCleanup(): void {
+    // cleanupSignal では結果に触れず、入力の購読だけを解除します。
+    unsubscribe();
   }
 
   for (const signal of validSignals) {

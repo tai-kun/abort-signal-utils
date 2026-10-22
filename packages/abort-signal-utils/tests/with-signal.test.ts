@@ -1,29 +1,7 @@
 import { describe, test } from "vitest";
 
 import withSignal from "../src/with-signal.js";
-
-/**
- * AbortSignal.prototype.throwIfAborted がない環境を再現する。
- * 破棄時に元に戻す。
- */
-function hideNativeThrowIfAborted(): Disposable {
-  const descriptor = Object.getOwnPropertyDescriptor(AbortSignal.prototype, "throwIfAborted");
-  Object.defineProperty(AbortSignal.prototype, "throwIfAborted", {
-    value: undefined,
-    writable: true,
-    enumerable: false,
-    configurable: true,
-  });
-  return {
-    [Symbol.dispose](): void {
-      if (descriptor === undefined) {
-        delete (AbortSignal.prototype as unknown as Record<string, unknown>)["throwIfAborted"];
-      } else {
-        Object.defineProperty(AbortSignal.prototype, "throwIfAborted", descriptor);
-      }
-    },
-  };
-}
+import { hideNativeThrowIfAborted } from "./support.js";
 
 describe("中断済みの場合", () => {
   test("作業を呼ばず中断理由で拒否される", async ({ expect }) => {

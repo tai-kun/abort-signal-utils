@@ -1,40 +1,7 @@
 import { describe, test } from "vitest";
 
 import throwIfAborted from "../src/throw-if-aborted.js";
-
-/**
- * 投げられた値（Error 以外を含む）を受け取る。
- */
-function catchThrown(action: () => void): unknown {
-  try {
-    action();
-  } catch (error) {
-    return error;
-  }
-  throw new Error("投げられなかった");
-}
-
-/**
- * AbortSignal.prototype.throwIfAborted がない環境を再現する。破棄時に元に戻す。
- */
-function hideNativeThrowIfAborted(): Disposable {
-  const descriptor = Object.getOwnPropertyDescriptor(AbortSignal.prototype, "throwIfAborted");
-  Object.defineProperty(AbortSignal.prototype, "throwIfAborted", {
-    value: undefined,
-    writable: true,
-    enumerable: false,
-    configurable: true,
-  });
-  return {
-    [Symbol.dispose](): void {
-      if (descriptor === undefined) {
-        delete (AbortSignal.prototype as unknown as Record<string, unknown>)["throwIfAborted"];
-      } else {
-        Object.defineProperty(AbortSignal.prototype, "throwIfAborted", descriptor);
-      }
-    },
-  };
-}
+import { catchThrown, hideNativeThrowIfAborted } from "./support.js";
 
 describe("throwIfAborted がある環境", () => {
   test.for([

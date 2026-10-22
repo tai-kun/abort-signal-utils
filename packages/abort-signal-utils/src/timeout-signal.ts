@@ -1,3 +1,5 @@
+import asAbortSignal from "./internal/abort-signal.js";
+
 /**
  * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/timeout-signal)
  */
@@ -35,7 +37,7 @@ export default function timeoutSignal(ms: number, options: TimeoutSignalOptions 
 
   const { reason, cleanupSignal } = options;
 
-  const cleanup = cleanupSignal instanceof AbortSignal ? cleanupSignal : undefined;
+  const cleanup = asAbortSignal(cleanupSignal);
 
   if (cleanup?.aborted) {
     // 中断済みの cleanupSignal ではタイマーを作らず未中断のまま残します。
@@ -44,7 +46,7 @@ export default function timeoutSignal(ms: number, options: TimeoutSignalOptions 
 
   if (
     reason === undefined &&
-    cleanupSignal === undefined &&
+    cleanup === undefined &&
     ms <= MAX_DELEGATABLE_MS &&
     typeof AbortSignal.timeout === "function"
   ) {
@@ -55,14 +57,19 @@ export default function timeoutSignal(ms: number, options: TimeoutSignalOptions 
   const controller = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
+  function unsubscribe(): void {
+    // 以後の発火を止めるため cleanupSignal の購読を解除します。
+    cleanup?.removeEventListener("abort", handleCleanup);
+  }
+
   function handleCleanup(): void {
     // cleanupSignal ではタイマーを止めて未中断のまま残します。
     if (timeoutId !== undefined) {
       clearTimeout(timeoutId);
+      timeoutId = undefined;
     }
 
-    // 以後の発火を止めるため購読を解除します。
-    cleanup?.removeEventListener("abort", handleCleanup);
+    unsubscribe();
   }
 
   function unrefTimeout(id: ReturnType<typeof setTimeout>): void {
@@ -80,7 +87,7 @@ export default function timeoutSignal(ms: number, options: TimeoutSignalOptions 
     timeoutId = setTimeout(() => {
       if (remaining <= MAX_TIMEOUT_MS) {
         // 時間が来たら cleanupSignal の購読を解除します。
-        cleanup?.removeEventListener("abort", handleCleanup);
+        unsubscribe();
 
         // 発火時に理由を決めて中断します。
         if (reason === undefined) {

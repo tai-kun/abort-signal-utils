@@ -182,6 +182,26 @@ describe("有効なシグナルが 1 つ以下", () => {
     expect(result).toBe(input.signal);
   });
 
+  test.for([
+    { label: "数値", value: 42 },
+    { label: "null", value: null },
+    { label: "中断済みを装うオブジェクト", value: { aborted: true } },
+  ] as const)(
+    "AbortSignal 以外の cleanupSignal は無視して単一の未中断をそのまま返す ($label)",
+    ({ value }, { expect }) => {
+      // 準備
+      const input = new AbortController();
+
+      // 実行
+      const result = combineSignalsFast([input.signal], {
+        cleanupSignal: value as unknown as AbortSignal,
+      });
+
+      // 検証
+      expect(result).toBe(input.signal);
+    },
+  );
+
   test("空配列では有効なcleanupがあっても未中断の新規シグナルを返す", ({ expect }) => {
     // 準備
     const cleanup = new AbortController();

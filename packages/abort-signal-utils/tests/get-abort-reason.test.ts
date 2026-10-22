@@ -1,39 +1,7 @@
-import { describe, test, vi } from "vitest";
+import { describe, test } from "vitest";
 
 import getAbortReason from "../src/get-abort-reason.js";
-
-/**
- * 理由が undefined のまま中断している稀な状態を再現する。
- */
-function createAbortedSignalWithUndefinedReason(): AbortSignal {
-  const controller = new AbortController();
-  controller.abort("placeholder");
-  const { signal } = controller;
-  Object.defineProperty(signal, "reason", {
-    value: undefined,
-    writable: true,
-    enumerable: true,
-    configurable: true,
-  });
-  return signal;
-}
-
-/**
- * 引数なし abort() の既定理由を差し替える。破棄時に元に戻す。
- */
-function stubDefaultAbortReason(reason: unknown): Disposable {
-  class StubAbortController extends AbortController {
-    public override abort(): void {
-      super.abort(reason);
-    }
-  }
-  vi.stubGlobal("AbortController", StubAbortController);
-  return {
-    [Symbol.dispose](): void {
-      vi.unstubAllGlobals();
-    },
-  };
-}
+import { createAbortedSignalWithUndefinedReason, stubDefaultAbortReason } from "./support.js";
 
 describe("理由が取り出せる場合", () => {
   test("未中断では undefined を返す", ({ expect }) => {

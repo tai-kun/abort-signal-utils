@@ -1,24 +1,7 @@
 import { describe, test } from "vitest";
 
 import toAbortPromise from "../src/to-abort-promise.js";
-
-/**
- * マイクロタスクを流しても PromiseLike が未確定のままなら true を返す。
- * 未確定の検証に使う。
- */
-async function isStillPending(promise: PromiseLike<never>): Promise<boolean> {
-  let settled = false;
-  promise.then(
-    () => {
-      settled = true;
-    },
-    () => {
-      settled = true;
-    },
-  );
-  await Promise.resolve();
-  return !settled;
-}
+import { createAbortedSignalWithUndefinedReason, isStillPending } from "./support.js";
 
 describe("未中断の場合", () => {
   test.for([
@@ -98,17 +81,10 @@ describe("中断済みの場合", () => {
 
   test("理由が undefined の中断済みでは代替の DOMException で拒否される", async ({ expect }) => {
     // 準備
-    const controller = new AbortController();
-    controller.abort("placeholder");
-    Object.defineProperty(controller.signal, "reason", {
-      value: undefined,
-      configurable: true,
-    });
+    const signal = createAbortedSignalWithUndefinedReason();
 
     // 実行と検証
-    await expect(Promise.resolve(toAbortPromise(controller.signal))).rejects.toBeInstanceOf(
-      DOMException,
-    );
+    await expect(Promise.resolve(toAbortPromise(signal))).rejects.toBeInstanceOf(DOMException);
   });
 });
 
@@ -166,6 +142,27 @@ describe("購読の解除", () => {
     // 検証
     await expect(Promise.resolve(wait)).rejects.toBe("boom");
   });
+
+  test.for([
+    { label: "数値", value: 42 },
+    { label: "null", value: null },
+    { label: "中断済みを装うオブジェクト", value: { aborted: true } },
+  ] as const)(
+    "AbortSignal 以外の cleanupSignal は無視する ($label)",
+    async ({ value }, { expect }) => {
+      // 準備
+      const controller = new AbortController();
+      const wait = toAbortPromise(controller.signal, {
+        cleanupSignal: value as unknown as AbortSignal,
+      });
+
+      // 実行
+      controller.abort("boom");
+
+      // 検証
+      await expect(Promise.resolve(wait)).rejects.toBe("boom");
+    },
+  );
 
   test("Symbol.dispose は dispose の別名である", async ({ expect }) => {
     // 準備
