@@ -259,6 +259,40 @@ describe.for(modes)("$label", ({ setup }) => {
     expect(removeEventListener).toHaveBeenCalledWith("abort", expect.any(Function));
   });
 
+  test("入力の中断中に cleanupSignal が中断しても入力の理由で中断する", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    input.signal.addEventListener("abort", () => {
+      cleanup.abort("cleanup");
+    });
+    const result = combineSignals([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 実行
+    input.abort("input");
+
+    // 検証
+    expect(result.aborted).toBe(true);
+    expect(result.reason).toBe("input");
+  });
+
+  test("cleanupSignal の中断中に入力が中断しても未中断のまま残る", ({ expect }) => {
+    // 準備
+    const input = new AbortController();
+    const cleanup = new AbortController();
+    cleanup.signal.addEventListener("abort", () => {
+      input.abort("input");
+    });
+    const result = combineSignals([input.signal], { cleanupSignal: cleanup.signal });
+
+    // 実行
+    cleanup.abort("cleanup");
+
+    // 検証
+    expect(result.aborted).toBe(false);
+    expect(result.reason).toBe(undefined);
+  });
+
   test("中断済みの cleanupSignal でも入力への追従は残る", ({ expect }) => {
     // 準備
     const input = new AbortController();

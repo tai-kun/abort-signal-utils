@@ -83,6 +83,7 @@ function combineManually(
   cleanupSignal: AbortSignal | undefined,
 ): AbortSignal {
   const controller = new AbortController();
+  let decided = false;
 
   function unsubscribe(): void {
     // 以後の発火を止めるため、入力と cleanupSignal の購読をまとめて解除します。
@@ -94,13 +95,41 @@ function combineManually(
   }
 
   function handleAbort(this: AbortSignal): void {
+    if (decided) {
+      return;
+    }
+
+    decided = true;
+
+    // cleanupSignal の中断が先に進行している場合は、入力の中断に追従しません。
+    if (cleanupSignal !== undefined && cleanupSignal !== this && cleanupSignal.aborted) {
+      unsubscribe();
+      return;
+    }
+
     // 入力の中断を結果に伝えます。
     controller.abort(this.reason);
     unsubscribe();
   }
 
   function handleCleanup(): void {
-    // cleanupSignal では結果に触れず、入力の購読だけを解除します。
+    if (decided) {
+      // 入力側ですでに結果が確定している場合は、購読の解除だけを行います。
+      unsubscribe();
+      return;
+    }
+
+    decided = true;
+
+    // cleanupSignal の中断中に入力が先に中断していた場合は、その理由を結果に伝えます。
+    for (const signal of validSignals) {
+      if (signal.aborted) {
+        controller.abort(signal.reason);
+        break;
+      }
+    }
+
+    // 入力が中断していなければ結果に触れず、購読だけを解除します。
     unsubscribe();
   }
 

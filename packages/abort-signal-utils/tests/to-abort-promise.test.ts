@@ -116,6 +116,40 @@ describe("購読の解除", () => {
     await expect(isStillPending(wait)).resolves.toBe(true);
   });
 
+  test("signal の中断中に cleanupSignal が中断しても signal の理由で拒否される", async ({
+    expect,
+  }) => {
+    // 準備
+    const controller = new AbortController();
+    const cleanup = new AbortController();
+    controller.signal.addEventListener("abort", () => {
+      cleanup.abort("cleanup");
+    });
+    const wait = toAbortPromise(controller.signal, { cleanupSignal: cleanup.signal });
+
+    // 実行
+    controller.abort("boom");
+
+    // 検証
+    await expect(Promise.resolve(wait)).rejects.toBe("boom");
+  });
+
+  test("cleanupSignal の中断中に signal が中断しても未確定のまま残る", async ({ expect }) => {
+    // 準備
+    const controller = new AbortController();
+    const cleanup = new AbortController();
+    cleanup.signal.addEventListener("abort", () => {
+      controller.abort("boom");
+    });
+    const wait = toAbortPromise(controller.signal, { cleanupSignal: cleanup.signal });
+
+    // 実行
+    cleanup.abort("cleanup");
+
+    // 検証
+    await expect(isStillPending(wait)).resolves.toBe(true);
+  });
+
   test("signal の中断後は cleanupSignal の中断が何もしない", async ({ expect }) => {
     // 準備
     const controller = new AbortController();

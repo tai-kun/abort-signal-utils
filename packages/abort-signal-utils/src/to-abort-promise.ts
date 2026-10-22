@@ -52,12 +52,41 @@ export default function toAbortPromise(
       cleanupSignal?.removeEventListener("abort", handleCleanup);
     };
 
+    let decided = false;
+
     const handleAbort = (): void => {
+      if (decided) {
+        return;
+      }
+
+      decided = true;
+
+      // cleanupSignal の中断が先に進行している場合は、signal の中断に追従しません。
+      if (cleanupSignal !== undefined && cleanupSignal !== signal && cleanupSignal.aborted) {
+        unsubscribe();
+        return;
+      }
+
       unsubscribe();
       reject(getAbortReason(signal));
     };
 
     const handleCleanup = (): void => {
+      if (decided) {
+        // signal 側ですでに結果が確定している場合は、購読の解除だけを行います。
+        unsubscribe();
+        return;
+      }
+
+      decided = true;
+
+      // cleanupSignal の中断中に signal が先に中断していた場合は、その理由で拒否します。
+      if (signal.aborted) {
+        unsubscribe();
+        reject(getAbortReason(signal));
+        return;
+      }
+
       unsubscribe();
     };
 
