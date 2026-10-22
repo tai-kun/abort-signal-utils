@@ -271,13 +271,14 @@ describe("分割待機", () => {
 
   test("2_147_483_648 では誤発火せず刻み進行で中断する", ({ expect }) => {
     // 準備
-    using _hide = hideAbortSignalTimeout();
+    const spy = vi.spyOn(AbortSignal, "timeout");
 
     // 実行
     const signal = timeoutSignal(2_147_483_648);
     vi.advanceTimersByTime(2_147_483_647);
 
     // 検証
+    expect(spy).not.toHaveBeenCalled();
     expect(signal.aborted).toBe(false);
 
     // 実行
@@ -352,16 +353,16 @@ describe("AbortSignal.timeout がある環境", () => {
     expect(result).toBe(nativeSignal);
   });
 
-  test("境界 4_294_967_295 では委譲する", ({ expect }) => {
+  test("境界 2_147_483_647 では委譲する", ({ expect }) => {
     // 準備
     const nativeSignal = AbortSignal.abort("native");
     const spy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(nativeSignal);
 
     // 実行
-    const result = timeoutSignal(4_294_967_295);
+    const result = timeoutSignal(2_147_483_647);
 
     // 検証
-    expect(spy).toHaveBeenCalledWith(4_294_967_295);
+    expect(spy).toHaveBeenCalledWith(2_147_483_647);
     expect(result).toBe(nativeSignal);
   });
 
@@ -393,12 +394,12 @@ describe("AbortSignal.timeout がある環境", () => {
     expect(signal.aborted).toBe(true);
   });
 
-  test("上限超えでは委譲せず自前で受け付ける", ({ expect }) => {
+  test("委譲上限を超えたら委譲せず自前で受け付ける", ({ expect }) => {
     // 準備
     const spy = vi.spyOn(AbortSignal, "timeout");
 
     // 実行
-    const signal = timeoutSignal(4_294_967_296);
+    const signal = timeoutSignal(2_147_483_648);
 
     // 検証
     expect(spy).not.toHaveBeenCalled();

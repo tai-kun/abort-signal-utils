@@ -17,8 +17,6 @@ export type TimeoutSignalOptions = {
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
-const MAX_DELEGATABLE_MS = 4_294_967_295;
-
 /**
  * [API Reference](https://tai-kun.github.io/abort-signal-utils/api/timeout-signal)
  */
@@ -47,10 +45,10 @@ export default function timeoutSignal(ms: number, options: TimeoutSignalOptions 
   if (
     reason === undefined &&
     cleanup === undefined &&
-    ms <= MAX_DELEGATABLE_MS &&
+    ms <= MAX_TIMEOUT_MS &&
     typeof AbortSignal.timeout === "function"
   ) {
-    // 条件が揃う場合はネイティブに委譲します。
+    // 単一タイマーの上限内で条件が揃う場合はネイティブに委譲します。
     return AbortSignal.timeout(ms);
   }
 
